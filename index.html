@@ -1,0 +1,1522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SMS Edge — Campaign Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <svg viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="8" fill="#3B82F6"/><path d="M8 14l4 4 8-8" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <span>SMS Edge</span>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-section">Analytics</div>
+    <div class="nav-item active" onclick="showTab('overview')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Dashboard
+    </div>
+    <div class="nav-item" onclick="showTab('countries')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
+      Countries
+    </div>
+    <div class="nav-item" onclick="showTab('brands')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+      Brands
+    </div>
+    <div class="nav-item" onclick="showTab('lists')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      Lists
+    </div>
+    <div class="nav-item" onclick="showTab('campaigns')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      All Campaigns
+    </div>
+    <div class="nav-item" onclick="showTab('content')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      Content Tracker
+    </div>
+    <div class="nav-section">Resources</div>
+    <div class="nav-item" onclick="showTab('questions')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      Open Questions
+    </div>
+  </nav>
+  <!-- TAKEAWAYS -->
+  <div class="takeaways" id="takeawaysContainer">
+    <div class="takeaways-toggle" onclick="toggleTakeaways(this)">
+      <span>Takeaways (8)</span>
+      <span class="tw-arrow">▼</span>
+    </div>
+    <div class="takeaways-list" id="takeawaysList">
+      <div class="takeaway"><div class="tw-label flag">✗ #1 Problem: CTR</div>Your bottleneck is clicks, not conversions. Cl→Reg and Reg→FTD are OK. Fix CTR with better SMS copy, timing (6-10pm), sender rotation.</div>
+      <div class="takeaway"><div class="tw-label flag">✗ €20/sale too low</div>CPA is €215 but revenue only €20. Push AM for higher CPA deals (€30-80) or rev share hybrid to fix unit economics.</div>
+      <div class="takeaway"><div class="tw-label warn">⚠ Norway anomaly</div>CTR 9-11% but only 0.6% click→registration. Clicks are fake or LP is broken for NO. Don't buy more NO lists.</div>
+      <div class="takeaway"><div class="tw-label good">✓ Retargeting 3× CTR</div>Clicked campaigns get 3× higher CTR. Always follow up on high-click lists. This is free revenue.</div>
+      <div class="takeaway"><div class="tw-label good">✓ Funnel is strong</div>When people click, 12% register and 8% buy. Problem is getting clicks, not converting them.</div>
+      <div class="takeaway"><div class="tw-label info">ℹ Reuse = profit</div>No list breaks even on 1 send. Lists need 5-10 sends across brands. Track lifetime, not single-send ROI.</div>
+      <div class="takeaway"><div class="tw-label good">✓ Best combo</div>FortunePlay × Italy lists — highest CTR + lead gen. Austria converts leads→sales best (15.7%).</div>
+      <div class="takeaway"><div class="tw-label info">ℹ 1,756 leads unmonetized</div>Retention team opportunity: 1,756 registered users only made 132 FTDs. Share content insights with retention.</div>
+      <button class="takeaway-add" onclick="addTakeaway()">+ Add takeaway</button>
+    </div>
+  </div>
+  <div class="sidebar-footer">Avg Sale: €20 · 168 campaigns</div>
+</aside>
+
+<!-- CONTENT -->
+<div class="content">
+
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <div class="topbar-left">
+      <h1>Campaign Dashboard</h1>
+      <p>168 campaigns · Apr 2025 – Mar 2026 · Source: SMS Edge</p>
+    </div>
+    <div class="topbar-right" style="flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:4px;background:#F8FAFC;border:1.5px solid #E2E8F0;border-radius:8px;padding:4px 10px">
+        <label style="font-size:11px;color:#64748B;font-weight:600;white-space:nowrap">From</label>
+        <input type="date" id="filterDateFrom" onchange="applyFilters()" style="border:none;background:transparent;font-size:12px;color:#334155;font-family:inherit;outline:none;cursor:pointer">
+        <label style="font-size:11px;color:#64748B;font-weight:600;white-space:nowrap;margin-left:6px">To</label>
+        <input type="date" id="filterDateTo" onchange="applyFilters()" style="border:none;background:transparent;font-size:12px;color:#334155;font-family:inherit;outline:none;cursor:pointer">
+      </div>
+      <select id="filterCountry" onchange="applyFilters()"><option value="">All Countries</option></select>
+      <select id="filterBrand" onchange="applyFilters()"><option value="">All Brands</option></select>
+      <select id="filterList" onchange="applyFilters()" style="min-width:140px"><option value="">All Lists</option></select>
+      <select id="filterType" onchange="applyFilters()"><option value="">All Types</option><option value="Fresh">Fresh</option><option value="Clicked">Clicked</option></select>
+      <button class="topbar-btn btn-ghost" onclick="resetFilters()">Reset</button>
+      <span id="filterCount" style="font-size:12px;color:#64748B;font-weight:600">168 shown</span>
+    </div>
+  </div>
+
+  <!-- TAB LABELS (hidden, controlled by sidebar) -->
+
+  <!-- ════════════ PAGE: OVERVIEW ════════════ -->
+  <div class="page active" id="page-overview">
+
+    <!-- KPI CARDS -->
+    <div class="kpi-row">
+      <div class="kpi-card">
+        <div class="kpi-label">Total Campaigns</div>
+        <div class="kpi-value" id="kpiCamps">168</div>
+        <div class="kpi-trend neutral"><span id="kpiCampsNote">3 profitable</span></div>
+        <div class="kpi-icon" style="background:#EFF6FF;color:#3B82F6">📊</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Total Sales</div>
+        <div class="kpi-value" id="kpiSales">132</div>
+        <div class="kpi-trend neutral"><span>1756 leads total</span></div>
+        <div class="kpi-icon" style="background:#F0FDF4;color:#16A34A">🎯</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Total Spend</div>
+        <div class="kpi-value" id="kpiSpend">€28,374</div>
+        <div class="kpi-trend down" id="kpiROIBadge">-90.7% ROI</div>
+        <div class="kpi-icon" style="background:#FEF2F2;color:#DC2626">💸</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Avg CTR</div>
+        <div class="kpi-value" id="kpiCTR">2.41%</div>
+        <div class="kpi-trend neutral">CPA: €215</div>
+        <div class="kpi-icon" style="background:#FDF4FF;color:#A855F7">👆</div>
+      </div>
+    </div>
+
+    <!-- UPLOAD ZONE -->
+    <div class="dropzone" id="dropzone" onclick="document.getElementById('fileInput').click()">
+      <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" style="display:none" onchange="handleFile(this.files[0])">
+      <div class="dropzone-icon">📂</div>
+      <div class="dropzone-title">Drop your SMS Edge CSV here to update</div>
+      <div class="dropzone-sub">or <a>click to browse</a> · Accepts .csv exports from SMS Edge</div>
+      <div class="dropzone-status" id="dropStatus"></div>
+    </div>
+
+    <!-- CHARTS ROW -->
+    <div class="grid-2">
+      <!-- COST DONUT -->
+      <div class="card">
+        <div class="card-header">
+          <div><div class="card-title">Cost Breakdown</div><div class="card-subtitle">€28,373.72 total spend</div></div>
+        </div>
+        <div style="display:flex;gap:24px;align-items:flex-start">
+          <div style="position:relative;width:200px;height:200px;flex-shrink:0">
+            <canvas id="chartDonut"></canvas>
+            <div class="donut-center">
+              <div class="donut-center-val">€28.4k</div>
+              <div class="donut-center-lbl">Total cost</div>
+            </div>
+          </div>
+          <div class="legend" id="donutLegend" style="flex:1"></div>
+        </div>
+      </div>
+
+      <!-- LEADS BAR -->
+      <div class="card">
+        <div class="card-header">
+          <div><div class="card-title">Sales by Country</div><div class="card-subtitle">132 total sales / 10 countries</div></div>
+        </div>
+        <div class="chart-wrap-sm"><canvas id="chartSalesCountry"></canvas></div>
+      </div>
+    </div>
+
+    <!-- CHARTS ROW 2 -->
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header">
+          <div><div class="card-title">CTR % by Country</div><div class="card-subtitle">Avg CTR across all campaigns per country</div></div>
+        </div>
+        <div class="chart-wrap"><canvas id="chartCTRCountry"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div><div class="card-title">Sales by Brand</div><div class="card-subtitle">Total sales per brand</div></div>
+        </div>
+        <div class="chart-wrap"><canvas id="chartBrandSales"></canvas></div>
+      </div>
+    </div>
+
+    <!-- CONVERSION FUNNEL: Clicks → Leads → Sales -->
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header"><div><div class="card-title">Conversion Funnel by Country</div><div class="card-subtitle">Click → Lead → Sale rates (higher = better quality traffic)</div></div></div>
+        <div class="chart-wrap"><canvas id="chartFunnelCountry"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div><div class="card-title">Lead Generation by Country</div><div class="card-subtitle">1,756 total leads · 11.8% click→lead · 7.5% lead→sale</div></div></div>
+        <div class="chart-wrap"><canvas id="chartLeadsCountry"></canvas></div>
+      </div>
+    </div>
+
+    <!-- CTR BENCHMARKS + COST PER COUNTRY -->
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header"><div><div class="card-title">CTR Benchmarks by Country</div><div class="card-subtitle">What's a "good" CTR? Compare against median (2.41% overall avg)</div></div></div>
+        <table style="font-size:13px">
+  <thead><tr><th>Country</th><th>Your CTR</th><th>vs Median</th><th>Cl→Lead</th><th>Lead→Sale</th><th>Verdict</th></tr></thead>
+  <tbody><tr>
+      <td style="font-weight:600">Norway</td>
+      <td class="num" style="font-weight:700;color:#16A34A">8.67%</td>
+      <td class="num" style="color:#16A34A">↑ Above</td>
+      <td class="num">0.6%</td>
+      <td class="num">14.3%</td>
+      <td style="font-size:11px;color:#64748B">High clicks, low conversion — check landing page</td>
+    </tr><tr>
+      <td style="font-weight:600">Canada</td>
+      <td class="num" style="font-weight:700;color:#16A34A">7.26%</td>
+      <td class="num" style="color:#16A34A">↑ Above</td>
+      <td class="num">0.2%</td>
+      <td class="num">0.0%</td>
+      <td style="font-size:11px;color:#64748B">High clicks, low conversion — check landing page</td>
+    </tr><tr>
+      <td style="font-weight:600">New Zealand</td>
+      <td class="num" style="font-weight:700;color:#16A34A">4.73%</td>
+      <td class="num" style="color:#16A34A">↑ Above</td>
+      <td class="num">1.8%</td>
+      <td class="num">0.0%</td>
+      <td style="font-size:11px;color:#64748B">Average — test new SMS copy</td>
+    </tr><tr>
+      <td style="font-weight:600">Spain</td>
+      <td class="num" style="font-weight:700;color:#16A34A">3.57%</td>
+      <td class="num" style="color:#16A34A">↑ Above</td>
+      <td class="num">100.0%</td>
+      <td class="num">100.0%</td>
+      <td style="font-size:11px;color:#64748B">Decent — optimize SMS copy</td>
+    </tr><tr>
+      <td style="font-weight:600">Ireland</td>
+      <td class="num" style="font-weight:700;color:#16A34A">2.72%</td>
+      <td class="num" style="color:#16A34A">↑ Above</td>
+      <td class="num">2.3%</td>
+      <td class="num">20.0%</td>
+      <td style="font-size:11px;color:#64748B">Average — test new SMS copy</td>
+    </tr><tr>
+      <td style="font-weight:600">Switzerland</td>
+      <td class="num" style="font-weight:700;color:#DC2626">2.48%</td>
+      <td class="num" style="color:#DC2626">↓ Below</td>
+      <td class="num">12.1%</td>
+      <td class="num">12.5%</td>
+      <td style="font-size:11px;color:#64748B">Decent — optimize SMS copy</td>
+    </tr><tr>
+      <td style="font-weight:600">Italy</td>
+      <td class="num" style="font-weight:700;color:#DC2626">2.15%</td>
+      <td class="num" style="color:#DC2626">↓ Below</td>
+      <td class="num">17.8%</td>
+      <td class="num">6.0%</td>
+      <td style="font-size:11px;color:#64748B">Decent — optimize SMS copy</td>
+    </tr><tr>
+      <td style="font-weight:600">Germany</td>
+      <td class="num" style="font-weight:700;color:#DC2626">1.89%</td>
+      <td class="num" style="color:#DC2626">↓ Below</td>
+      <td class="num">13.6%</td>
+      <td class="num">6.5%</td>
+      <td style="font-size:11px;color:#64748B">Below average — review list quality</td>
+    </tr><tr>
+      <td style="font-weight:600">Australia</td>
+      <td class="num" style="font-weight:700;color:#DC2626">1.86%</td>
+      <td class="num" style="color:#DC2626">↓ Below</td>
+      <td class="num">14.7%</td>
+      <td class="num">8.6%</td>
+      <td style="font-size:11px;color:#64748B">Below average — review list quality</td>
+    </tr><tr>
+      <td style="font-weight:600">Austria</td>
+      <td class="num" style="font-weight:700;color:#DC2626">1.31%</td>
+      <td class="num" style="color:#DC2626">↓ Below</td>
+      <td class="num">17.0%</td>
+      <td class="num">15.7%</td>
+      <td style="font-size:11px;color:#64748B">Below average — review list quality</td>
+    </tr></tbody></table>
+      </div>
+      <div class="card">
+        <div class="card-header"><div><div class="card-title">Cost Benchmarks by Country</div><div class="card-subtitle">Avg cost per campaign & per click — key for list purchase decisions</div></div></div>
+        <table style="font-size:13px">
+  <thead><tr><th>Country</th><th>Campaigns</th><th>Avg €/Campaign</th><th>€/Click</th><th>Total Spend</th><th>% of Budget</th></tr></thead>
+  <tbody><tr>
+      <td style="font-weight:600">Italy</td>
+      <td class="num">45</td>
+      <td class="num" style="font-weight:600">€210</td>
+      <td class="num">€2.10</td>
+      <td class="num">€9,447</td>
+      <td class="num">33.3%</td>
+    </tr><tr>
+      <td style="font-weight:600">Germany</td>
+      <td class="num">36</td>
+      <td class="num" style="font-weight:600">€250</td>
+      <td class="num">€3.29</td>
+      <td class="num">€9,011</td>
+      <td class="num">31.8%</td>
+    </tr><tr>
+      <td style="font-weight:600">Australia</td>
+      <td class="num">27</td>
+      <td class="num" style="font-weight:600">€174</td>
+      <td class="num">€1.74</td>
+      <td class="num">€4,704</td>
+      <td class="num">16.6%</td>
+    </tr><tr>
+      <td style="font-weight:600">Switzerland</td>
+      <td class="num">16</td>
+      <td class="num" style="font-weight:600">€97</td>
+      <td class="num">€2.13</td>
+      <td class="num">€1,552</td>
+      <td class="num">5.5%</td>
+    </tr><tr>
+      <td style="font-weight:600">Norway</td>
+      <td class="num">10</td>
+      <td class="num" style="font-weight:600">€121</td>
+      <td class="num">€0.49</td>
+      <td class="num">€1,213</td>
+      <td class="num">4.3%</td>
+    </tr><tr>
+      <td style="font-weight:600">Austria</td>
+      <td class="num">16</td>
+      <td class="num" style="font-weight:600">€61</td>
+      <td class="num">€2.37</td>
+      <td class="num">€976</td>
+      <td class="num">3.4%</td>
+    </tr><tr>
+      <td style="font-weight:600">New Zealand</td>
+      <td class="num">4</td>
+      <td class="num" style="font-weight:600">€186</td>
+      <td class="num">€1.48</td>
+      <td class="num">€744</td>
+      <td class="num">2.6%</td>
+    </tr><tr>
+      <td style="font-weight:600">Ireland</td>
+      <td class="num">8</td>
+      <td class="num" style="font-weight:600">€69</td>
+      <td class="num">€2.49</td>
+      <td class="num">€550</td>
+      <td class="num">1.9%</td>
+    </tr><tr>
+      <td style="font-weight:600">Canada</td>
+      <td class="num">3</td>
+      <td class="num" style="font-weight:600">€59</td>
+      <td class="num">€0.30</td>
+      <td class="num">€177</td>
+      <td class="num">0.6%</td>
+    </tr><tr>
+      <td style="font-weight:600">Spain</td>
+      <td class="num">1</td>
+      <td class="num" style="font-weight:600">€1</td>
+      <td class="num">€1.04</td>
+      <td class="num">€1</td>
+      <td class="num">0.0%</td>
+    </tr></tbody></table>
+      </div>
+    </div>
+
+    <!-- LIST & BRAND BENCHMARKS -->
+    <div class="card" style="margin-bottom:24px">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Brand Performance Verdicts</div>
+          <div class="card-subtitle">10 brands · Sorted by CTR · Median CTR: 2.14%</div>
+        </div>
+      </div>
+      <div style="overflow-x:auto"><table style="font-size:13px">
+  <thead><tr><th>Brand</th><th>Campaigns</th><th>CTR</th><th>Cl→Lead</th><th>Lead→Sale</th><th>Leads</th><th>Sales</th><th>ROI</th><th>Verdict</th></tr></thead>
+  <tbody><tr>
+      <td style="font-weight:600">FortunePlay</td>
+      <td class="num">15</td>
+      <td class="num" style="font-weight:700;color:#16A34A">3.43%</td>
+      <td class="num">10.5%</td>
+      <td class="num">9.9%</td>
+      <td class="num" style="font-weight:600">223</td>
+      <td class="num">22</td>
+      <td class="num" style="color:#DC2626;font-weight:600">-82.9%</td>
+      <td style="font-size:11px">🟢 Top performer — high CTR + good conversion</td>
+    </tr><tr>
+      <td style="font-weight:600">PlayMojo</td>
+      <td class="num">21</td>
+      <td class="num" style="font-weight:700;color:#16A34A">3.25%</td>
+      <td class="num">10.9%</td>
+      <td class="num">5.3%</td>
+      <td class="num" style="font-weight:600">284</td>
+      <td class="num">15</td>
+      <td class="num" style="color:#DC2626;font-weight:600">-91.5%</td>
+      <td style="font-size:11px">🟢 Strong traffic + leads — optimize retention</td>
+    </tr><tr>
+      <td style="font-weight:600">LuckyVibe</td>
+      <td class="num">24</td>
+      <td class="num" style="font-weight:700;color:#16A34A">2.94%</td>
+      <td class="num">13.3%</td>
+      <td class="num">8.2%</td>
+      <td class="num" style="font-weight:600">268</td>
+      <td class="num">22</td>
+      <td class="num" style="color:#DC2626;font-weight:600">-87.4%</td>
+      <td style="font-size:11px">🔵 Decent — converts leads well</td>
+    </tr><tr>
+      <td style="font-weight:600">SpinsUp</td>
+      <td class="num">34</td>
+      <td class="num" style="font-weight:700;color:#16A34A">2.42%</td>
+      <td class="num">10.2%</td>
+      <td class="num">9.7%</td>
+      <td class="num" style="font-weight:600">237</td>
+      <td class="num">23</td>
+      <td class="num" style="color:#DC2626;font-weight:600">-90.2%</td>
+      <td style="font-size:11px">🔵 Decent — converts leads well</td>
+    </tr><tr>
+      <td style="font-weight:600">Rooster</td>
+      <td class="num">12</td>
+      <td class="num" style="font-weight:700;color:#16A34A">2.27%</td>
+      <td class="num">10.1%</td>
+      <td class="num">5.0%</td>
+      <td class="num" style="font-weight:600">119</td>
+      <td class="num">6</td>
+      <td class="num" style="color:#DC2626;font-weight:600">-93.8%</td>
+      <td style="font-size:11px">🔵 Average CTR but good lead gen</td>
+    </tr><tr>
+      <td style="font-weight:600">Rooster.bet</td>
+      <td class="num">1</td>
+      <td class="num" style="font-weight:700;color:#DC2626">2.02%</td>
+      <td class="num">13.6%</td>
+      <td class="num">7.1%</td>
+      <td class="num" style="font-weight:600">14</td>
+      <td class="num">1</td>
+      <td class="num" style="color:#DC2626;font-weight:600">-91.3%</td>
+      <td style="font-size:11px">🔵 Average CTR but good lead gen</td>
+    </tr><tr>
+      <td style="font-weight:600">Lucky7Even</td>
+      <td class="num">12</td>
+      <td class="num" style="font-weight:700;color:#DC2626">1.97%</td>
+      <td class="num">17.8%</td>
+      <td class="num">6.2%</td>
+      <td class="num" style="font-weight:600">145</td>
+      <td class="num">9</td>
+      <td class="num" style="color:#DC2626;font-weight:600">-90.1%</td>
+      <td style="font-size:11px">🔴 Below average — review brand and SMS copy fit</td>
+    </tr><tr>
+      <td style="font-weight:600">SpinJo</td>
+      <td class="num">19</td>
+      <td class="num" style="font-weight:700;color:#DC2626">1.81%</td>
+      <td class="num">13.0%</td>
+      <td class="num">5.2%</td>
+      <td class="num" style="font-weight:600">194</td>
+      <td class="num">10</td>
+      <td class="num" style="color:#DC2626;font-weight:600">-94.9%</td>
+      <td style="font-size:11px">🔴 Below average — review brand and SMS copy fit</td>
+    </tr><tr>
+      <td style="font-weight:600">RocketSpin</td>
+      <td class="num">17</td>
+      <td class="num" style="font-weight:700;color:#DC2626">1.68%</td>
+      <td class="num">12.7%</td>
+      <td class="num">11.1%</td>
+      <td class="num" style="font-weight:600">144</td>
+      <td class="num">16</td>
+      <td class="num" style="color:#DC2626;font-weight:600">-88.8%</td>
+      <td style="font-size:11px">🟡 Low CTR but decent sales volume</td>
+    </tr><tr>
+      <td style="font-weight:600">Rollero</td>
+      <td class="num">9</td>
+      <td class="num" style="font-weight:700;color:#DC2626">1.47%</td>
+      <td class="num">15.6%</td>
+      <td class="num">5.5%</td>
+      <td class="num" style="font-weight:600">127</td>
+      <td class="num">7</td>
+      <td class="num" style="color:#DC2626;font-weight:600">-95.3%</td>
+      <td style="font-size:11px">🔴 Below average — review brand and SMS copy fit</td>
+    </tr></tbody></table></div>
+    </div>
+
+    <div class="card" style="margin-bottom:24px">
+      <div class="card-header">
+        <div>
+          <div class="card-title">List Performance Verdicts</div>
+          <div class="card-subtitle">All 30 lists · Sorted by CTR · Median CTR: 1.96%</div>
+        </div>
+      </div>
+      <div style="overflow-x:auto"><table style="font-size:13px">
+  <thead><tr><th>List Name</th><th>Countries</th><th>CTR</th><th>Cl→Lead</th><th>Leads</th><th>Sales</th><th>ROI</th><th>Verdict</th></tr></thead>
+  <tbody><tr>
+      <td style="font-weight:600;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Roy Boy_NO_12012026_1.7K">Roy Boy_NO_12012026_1.7K</td>
+      <td style="font-size:11px;color:#64748B">Norway</td>
+      <td class="num" style="font-weight:700;color:#16A34A">10.29%</td>
+      <td class="num">1.2%</td>
+      <td class="num">5</td>
+      <td class="num">0</td>
+      <td class="num" style="color:#DC2626;font-weight:600">-100.0%</td>
+      <td style="font-size:11px">🟡 High CTR but low registrations — check landing page</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Roy Roy Boy_NO_12012026_1.7K">Roy Roy Boy_NO_12012026_1.7K</td>
+      <td style="font-size:11px;color:#64748B">Norway</td>
+      <td class="num" style="font-weight:700;color:#16A34A">10.08%</td>
+      <td class="num">0.0%</td>
+      <td class="num">0</td>
+      <td class="num">0</td>
+      <td class="num" style="color:#DC2626;font-weight:600">-100.0%</td>
+      <td style="font-size:11px">🟡 High CTR but low registrations — check landing page</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Roy Boy - NO_Consol_22012026">Roy Boy - NO_Consol_22012026</td>
+      <td style="font-size:11px;color:#64748B">Norway</td>
+      <td class="num" style="font-weight:700;color:#16A34A">8.87%</td>
+      <td class="num">0.4%</td>
+      <td class="num">8</td>
+      <td class="num">1</td>
+      <td class="num" style="color:#DC2626;font-weight:600">-97.7%</td>
+      <td style="font-size:11px">🟡 High CTR but low registrations — check landing page</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Roy Boy - CA_Consol_22012026">Roy Boy - CA_Consol_22012026</td>
+      <td style="font-size:11px;color:#64748B">Canada</td>
+      <td class="num" style="font-weight:700;color:#16A34A">7.84%</td>
+      <td class="num">0.3%</td>
+      <td class="num">1</td>
+      <td class="num">0</td>
+      <td class="num" style="color:#DC2626;font-weight:600">-100.0%</td>
+      <td style="font-size:11px">🟡 High CTR but low registrations — check landing page</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Lilly_CA_SMSedge_Batch1_10K">Lilly_CA_SMSedge_Batch1_10K</td>
+      <td style="font-size:11px;color:#64748B">Canada</td>
+      <td class="num" style="font-weight:700;color:#16A34A">6.68%</td>
+      <td class="num">0.0%</td>
+      <td class="num">0</td>
+      <td class="num">0</td>
+      <td class="num" style="color:#DC2626;font-weight:600">-100.0%</td>
+      <td style="font-size:11px">🟡 High CTR but low registrations — check landing page</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Lilly_NZ_SMSedge_Batch1_10K">Lilly_NZ_SMSedge_Batch1_10K</td>
+      <td style="font-size:11px;color:#64748B">New Zealand</td>
+      <td class="num" style="font-weight:700;color:#16A34A">3.33%</td>
+      <td class="num">1.5%</td>
+      <td class="num">2</td>
+      <td class="num">0</td>
+      <td class="num" style="color:#DC2626;font-weight:600">-100.0%</td>
+      <td style="font-size:11px">🟡 Decent CTR — optimize SMS copy and landing page</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Roy Boy - AU_Consol_22012026">Roy Boy - AU_Consol_22012026</td>
+      <td style="font-size:11px;color:#64748B">Australia</td>
+      <td class="num" style="font-weight:700;color:#16A34A">3.13%</td>
+      <td class="num">12.6%</td>
+      <td class="num">106</td>
+      <td class="num">13</td>
+      <td class="num" style="color:#DC2626;font-weight:600">-70.1%</td>
+      <td style="font-size:11px">🟢 Good all-round performer</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Artium_IT_13032026">Artium_IT_13032026</td>
+      <td style="font-size:11px;color:#64748B">Italy</td>
+      <td class="num" style="font-weight:700;color:#16A34A">2.77%</td>
+      <td class="num">36.2%</td>
+      <td class="num">17</td>
+      <td class="num">1</td>
+      <td class="num" style="color:#DC2626;font-weight:600">-74.8%</td>
+      <td style="font-size:11px">🟢 Good all-round performer</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Roy Boy - IE_Consol_22012026">Roy Boy - IE_Consol_22012026</td>
+      <td style="font-size:11px;color:#64748B">Ireland</td>
+      <td class="num" style="font-weight:700;color:#16A34A">2.75%</td>
+      <td class="num">2.6%</td>
+      <td class="num">5</td>
+      <td class="num">1</td>
+      <td class="num" style="color:#DC2626;font-weight:600">-95.7%</td>
+      <td style="font-size:11px">🟡 Decent CTR — optimize SMS copy and landing page</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Roy Boy_IT_19112025_Batch3_10K">Roy Boy_IT_19112025_Batch3_10K</td>
+      <td style="font-size:11px;color:#64748B">Italy</td>
+      <td class="num" style="font-weight:700;color:#16A34A">2.46%</td>
+      <td class="num">15.4%</td>
+      <td class="num">113</td>
+      <td class="num">8</td>
+      <td class="num" style="color:#DC2626;font-weight:600">-87.6%</td>
+      <td style="font-size:11px">🟢 Good all-round performer</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Roy Boy_AU_12012026_4K">Roy Boy_AU_12012026_4K</td>
+      <td style="font-size:11px;color:#64748B">Australia</td>
+      <td class="num" style="font-weight:700;color:#16A34A">2.40%</td>
+      <td class="num">17.7%</td>
+      <td class="num">45</td>
+      <td class="num">3</td>
+      <td class="num" style="color:#DC2626;font-weight:600">-81.4%</td>
+      <td style="font-size:11px">🟢 Good all-round performer</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Roy Boy - CH_Consol_22012026">Roy Boy - CH_Consol_22012026</td>
+      <td style="font-size:11px;color:#64748B">Switzerland</td>
+      <td class="num" style="font-weight:700;color:#16A34A">2.29%</td>
+      <td class="num">10.7%</td>
+      <td class="num">36</td>
+      <td class="num">4</td>
+      <td class="num" style="color:#DC2626;font-weight:600">-89.7%</td>
+      <td style="font-size:11px">🟢 Good all-round performer</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Roy Boy_CH_19112025_Batch1_2K">Roy Boy_CH_19112025_Batch1_2K</td>
+      <td style="font-size:11px;color:#64748B">Switzerland</td>
+      <td class="num" style="font-weight:700;color:#16A34A">2.10%</td>
+      <td class="num">13.0%</td>
+      <td class="num">38</td>
+      <td class="num">6</td>
+      <td class="num" style="color:#DC2626;font-weight:600">-83.6%</td>
+      <td style="font-size:11px">🟢 Good all-round performer</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Roy Boy_IT_12012026_4K">Roy Boy_IT_12012026_4K</td>
+      <td style="font-size:11px;color:#64748B">Italy</td>
+      <td class="num" style="font-weight:700;color:#16A34A">1.98%</td>
+      <td class="num">23.2%</td>
+      <td class="num">62</td>
+      <td class="num">5</td>
+      <td class="num" style="color:#DC2626;font-weight:600">-83.0%</td>
+      <td style="font-size:11px">🔵 Low CTR but strong lead gen — keep for retention</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Roy Boy_DE_12012026_5K">Roy Boy_DE_12012026_5K</td>
+      <td style="font-size:11px;color:#64748B">Germany</td>
+      <td class="num" style="font-weight:700;color:#16A34A">1.98%</td>
+      <td class="num">15.0%</td>
+      <td class="num">43</td>
+      <td class="num">5</td>
+      <td class="num" style="color:#DC2626;font-weight:600">-88.7%</td>
+      <td style="font-size:11px">🔵 Low CTR but strong lead gen — keep for retention</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Lilly_DE_SMSedge_Batch1_10K">Lilly_DE_SMSedge_Batch1_10K</td>
+      <td style="font-size:11px;color:#64748B">Germany</td>
+      <td class="num" style="font-weight:700;color:#DC2626">1.94%</td>
+      <td class="num">13.1%</td>
+      <td class="num">72</td>
+      <td class="num">2</td>
+      <td class="num" style="color:#DC2626;font-weight:600">-97.5%</td>
+      <td style="font-size:11px">🔵 Low CTR but strong lead gen — keep for retention</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="IE_Consol_22012026">IE_Consol_22012026</td>
+      <td style="font-size:11px;color:#64748B">Ireland</td>
+      <td class="num" style="font-weight:700;color:#DC2626">1.92%</td>
+      <td class="num">0.0%</td>
+      <td class="num">0</td>
+      <td class="num">0</td>
+      <td class="num" style="color:#DC2626;font-weight:600">-100.0%</td>
+      <td style="font-size:11px">🔴 Underperforming — review or drop</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Lilly_DE_25082025_Batch1_10K">Lilly_DE_25082025_Batch1_10K</td>
+      <td style="font-size:11px;color:#64748B">Germany</td>
+      <td class="num" style="font-weight:700;color:#DC2626">1.90%</td>
+      <td class="num">8.4%</td>
+      <td class="num">8</td>
+      <td class="num">0</td>
+      <td class="num" style="color:#DC2626;font-weight:600">-100.0%</td>
+      <td style="font-size:11px">🔴 Underperforming — review or drop</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Roy Boy_IT_25082025_Batch1_10K">Roy Boy_IT_25082025_Batch1_10K</td>
+      <td style="font-size:11px;color:#64748B">Italy</td>
+      <td class="num" style="font-weight:700;color:#DC2626">1.83%</td>
+      <td class="num">15.7%</td>
+      <td class="num">197</td>
+      <td class="num">15</td>
+      <td class="num" style="color:#DC2626;font-weight:600">-91.0%</td>
+      <td style="font-size:11px">🔵 Low CTR but strong lead gen — keep for retention</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Roy Boy_IT_19112025_Batch2_10K">Roy Boy_IT_19112025_Batch2_10K</td>
+      <td style="font-size:11px;color:#64748B">Italy</td>
+      <td class="num" style="font-weight:700;color:#DC2626">1.82%</td>
+      <td class="num">16.2%</td>
+      <td class="num">127</td>
+      <td class="num">9</td>
+      <td class="num" style="color:#DC2626;font-weight:600">-90.2%</td>
+      <td style="font-size:11px">🔵 Low CTR but strong lead gen — keep for retention</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Roy Boy - DE_Consol_22012026">Roy Boy - DE_Consol_22012026</td>
+      <td style="font-size:11px;color:#64748B">Germany</td>
+      <td class="num" style="font-weight:700;color:#DC2626">1.73%</td>
+      <td class="num">10.9%</td>
+      <td class="num">51</td>
+      <td class="num">2</td>
+      <td class="num" style="color:#DC2626;font-weight:600">-97.7%</td>
+      <td style="font-size:11px">🔵 Low CTR but strong lead gen — keep for retention</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Roy Boy_AU_25082025_Batch1_10K">Roy Boy_AU_25082025_Batch1_10K</td>
+      <td style="font-size:11px;color:#64748B">Australia</td>
+      <td class="num" style="font-weight:700;color:#DC2626">1.52%</td>
+      <td class="num">14.3%</td>
+      <td class="num">168</td>
+      <td class="num">9</td>
+      <td class="num" style="color:#DC2626;font-weight:600">-92.8%</td>
+      <td style="font-size:11px">🔵 Low CTR but strong lead gen — keep for retention</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Roy Boy_DE_19112025_Batch1_10K">Roy Boy_DE_19112025_Batch1_10K</td>
+      <td style="font-size:11px;color:#64748B">Germany</td>
+      <td class="num" style="font-weight:700;color:#DC2626">1.43%</td>
+      <td class="num">15.2%</td>
+      <td class="num">119</td>
+      <td class="num">7</td>
+      <td class="num" style="color:#DC2626;font-weight:600">-96.2%</td>
+      <td style="font-size:11px">🔵 Low CTR but strong lead gen — keep for retention</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Artium_DE_13032026">Artium_DE_13032026</td>
+      <td style="font-size:11px;color:#64748B">Germany, Italy</td>
+      <td class="num" style="font-weight:700;color:#DC2626">1.41%</td>
+      <td class="num">2.6%</td>
+      <td class="num">1</td>
+      <td class="num">0</td>
+      <td class="num" style="color:#DC2626;font-weight:600">-100.0%</td>
+      <td style="font-size:11px">🔴 Underperforming — review or drop</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Roy Boy_AT_19112025_Batch1_2K">Roy Boy_AT_19112025_Batch1_2K</td>
+      <td style="font-size:11px;color:#64748B">Austria</td>
+      <td class="num" style="font-weight:700;color:#DC2626">1.40%</td>
+      <td class="num">15.2%</td>
+      <td class="num">39</td>
+      <td class="num">4</td>
+      <td class="num" style="color:#DC2626;font-weight:600">-86.2%</td>
+      <td style="font-size:11px">🔵 Low CTR but strong lead gen — keep for retention</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Roy Boy - IT_Consol_22012026">Roy Boy - IT_Consol_22012026</td>
+      <td style="font-size:11px;color:#64748B">Italy</td>
+      <td class="num" style="font-weight:700;color:#DC2626">1.19%</td>
+      <td class="num">22.2%</td>
+      <td class="num">70</td>
+      <td class="num">3</td>
+      <td class="num" style="color:#DC2626;font-weight:600">-94.7%</td>
+      <td style="font-size:11px">🔵 Low CTR but strong lead gen — keep for retention</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Roy Boy - AT_Consol_22012026">Roy Boy - AT_Consol_22012026</td>
+      <td style="font-size:11px;color:#64748B">Austria</td>
+      <td class="num" style="font-weight:700;color:#DC2626">1.06%</td>
+      <td class="num">20.7%</td>
+      <td class="num">28</td>
+      <td class="num">7</td>
+      <td class="num" style="color:#DC2626;font-weight:600">-63.2%</td>
+      <td style="font-size:11px">🔵 Low CTR but strong lead gen — keep for retention</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Lilly_AU_25082025_Batch1_10K">Lilly_AU_25082025_Batch1_10K</td>
+      <td style="font-size:11px;color:#64748B">Australia</td>
+      <td class="num" style="font-weight:700;color:#DC2626">0.86%</td>
+      <td class="num">18.9%</td>
+      <td class="num">37</td>
+      <td class="num">2</td>
+      <td class="num" style="color:#DC2626;font-weight:600">-94.5%</td>
+      <td style="font-size:11px">🟡 Low CTR but some leads</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Lilly_DE_07112025_Batch1_10K">Lilly_DE_07112025_Batch1_10K</td>
+      <td style="font-size:11px;color:#64748B">Germany</td>
+      <td class="num" style="font-weight:700;color:#DC2626">0.18%</td>
+      <td class="num">12.5%</td>
+      <td class="num">1</td>
+      <td class="num">0</td>
+      <td class="num" style="color:#DC2626;font-weight:600">-100.0%</td>
+      <td style="font-size:11px">🔴 Poor — not worth reusing</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Artium_AU_13032026">Artium_AU_13032026</td>
+      <td style="font-size:11px;color:#64748B">Australia</td>
+      <td class="num" style="font-weight:700;color:#DC2626">0.00%</td>
+      <td class="num">0.0%</td>
+      <td class="num">0</td>
+      <td class="num">0</td>
+      <td class="num" style="color:#16A34A;font-weight:600">+0.0%</td>
+      <td style="font-size:11px">🔴 Poor — not worth reusing</td>
+    </tr></tbody></table></div>
+    </div>
+
+    <!-- INDUSTRY BENCHMARKS -->
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">SMS Casino Industry Benchmarks</div>
+            <div class="card-subtitle">Expected performance ranges by country tier — compare your data against these</div>
+          </div>
+        </div>
+        <div style="overflow-x:auto"><table style="font-size:13px">
+  <thead><tr><th>Country Tier</th><th>Countries</th><th>List Cost / 1K contacts</th><th>Expected CTR</th><th>Expected Cl→Reg</th><th>Expected Reg→FTD</th></tr></thead>
+  <tbody>
+    <tr><td style="font-weight:600">Tier 1</td><td>Australia, Canada, NZ, Ireland</td><td class="num">€150 – €400</td><td class="num">3 – 10%</td><td class="num">20 – 40%</td><td class="num">20 – 35%</td></tr>
+    <tr><td style="font-weight:600">Tier 2</td><td>Germany, Austria, Switzerland, Italy</td><td class="num">€80 – €200</td><td class="num">1.5 – 4%</td><td class="num">10 – 25%</td><td class="num">5 – 15%</td></tr>
+    <tr><td style="font-weight:600">Tier 3</td><td>Norway, Spain</td><td class="num">€30 – €120</td><td class="num">5 – 15%</td><td class="num">0.5 – 5%</td><td class="num">5 – 20%</td></tr>
+  </tbody></table></div>
+        <div style="margin-top:12px;padding:10px 14px;background:#F8FAFC;border-radius:8px;font-size:12px;color:#64748B;line-height:1.6">
+          <strong style="color:#0F172A">Key insight:</strong> Your click→registration (11.8%) and registration→sale (7.5%) rates are decent.
+          The bottleneck is <strong style="color:#DC2626">CTR</strong> — not enough people clicking. Focus on SMS copy, send timing (6–10pm local), sender ID rotation, and list freshness.
+          Revenue per sale (€20) is low for casino — push for higher CPA deals (€30–€80) or rev share hybrid.
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Your Funnel vs Benchmarks</div>
+            <div class="card-subtitle">Where you stand against industry — green = on target, red = needs work</div>
+          </div>
+        </div>
+        <table style="font-size:13px">
+          <thead><tr><th>Metric</th><th>Your Avg</th><th>Industry Target</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td style="font-weight:600">CTR</td><td class="num">2.41%</td><td class="num">3 – 10%</td>
+              <td style="color:#DC2626;font-weight:600">🔴 Below — biggest lever to improve</td></tr>
+            <tr><td style="font-weight:600">Click → Registration</td><td class="num">11.8%</td><td class="num">20 – 40%</td>
+              <td style="color:#DC2626;font-weight:600">🔴 Below target — check landing pages</td></tr>
+            <tr><td style="font-weight:600">Registration → FTD (Sale)</td><td class="num">7.5%</td><td class="num">20 – 35%</td>
+              <td style="color:#F59E0B;font-weight:600">⚠ Below — retention team opportunity</td></tr>
+            <tr><td style="font-weight:600">CPA (Cost per Sale)</td><td class="num">€215</td><td class="num">&lt; €20</td>
+              <td style="color:#DC2626;font-weight:600">🔴 CPA €214 vs €20 revenue — need higher CPA deals</td></tr>
+            <tr><td style="font-weight:600">Revenue / Sale</td><td class="num">€20</td><td class="num">€30 – €80</td>
+              <td style="color:#F59E0B;font-weight:600">⚠ Low — negotiate higher CPA or rev share</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- BREAK-EVEN ANALYSIS -->
+    <div class="card" style="margin-bottom:24px">
+      <div class="card-header">
+        <div>
+          <div class="card-title">List Break-Even Tracker</div>
+          <div class="card-subtitle">Each list needs 48 sales avg to break even at €20/sale. Lists are reused across brands — track lifetime value, not single-send ROI.</div>
+        </div>
+      </div>
+      <div style="overflow-x:auto"><table style="font-size:13px">
+  <thead><tr><th>List</th><th>Countries</th><th>Total Sends</th><th>Brands</th><th>Combined Cost</th><th>RP Send Cost</th><th>Sales</th><th>Need</th><th>Progress to Break-Even</th><th>Status</th><th>Est. Sends Left</th></tr></thead>
+  <tbody><tr>
+      <td style="font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Roy Boy - AT_Consol_22012026">Roy Boy - AT_Consol_22012026</td>
+      <td style="font-size:11px;color:#64748B">Austria</td>
+      <td class="num">5</td>
+      <td class="num">5</td>
+      <td class="num">€381</td>
+      <td class="num" style="font-size:11px;color:#64748B">—</td>
+      <td class="num">7</td>
+      <td class="num">20</td>
+      <td style="min-width:120px"><div style="background:#F1F5F9;border-radius:4px;height:18px;position:relative;overflow:hidden">
+        <div style="background:#EF4444;height:100%;width:35%;border-radius:4px;transition:width .3s"></div>
+        <span style="position:absolute;left:6px;top:1px;font-size:10px;font-weight:700;color:#0F172A">35%</span>
+      </div></td>
+      <td style="font-size:11px">🔴 13 sales away</td>
+      <td class="num" style="font-size:11px;color:#64748B">10 sends</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Roy Boy - AU_Consol_22012026">Roy Boy - AU_Consol_22012026</td>
+      <td style="font-size:11px;color:#64748B">Australia</td>
+      <td class="num">5</td>
+      <td class="num">5</td>
+      <td class="num">€871</td>
+      <td class="num" style="font-size:11px;color:#64748B">—</td>
+      <td class="num">13</td>
+      <td class="num">44</td>
+      <td style="min-width:120px"><div style="background:#F1F5F9;border-radius:4px;height:18px;position:relative;overflow:hidden">
+        <div style="background:#EF4444;height:100%;width:30%;border-radius:4px;transition:width .3s"></div>
+        <span style="position:absolute;left:6px;top:1px;font-size:10px;font-weight:700;color:#0F172A">30%</span>
+      </div></td>
+      <td style="font-size:11px">🔴 31 sales away</td>
+      <td class="num" style="font-size:11px;color:#64748B">12 sends</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Artium_IT_13032026">Artium_IT_13032026</td>
+      <td style="font-size:11px;color:#64748B">Italy</td>
+      <td class="num">3</td>
+      <td class="num">3</td>
+      <td class="num">€79</td>
+      <td class="num" style="font-size:11px;color:#64748B">—</td>
+      <td class="num">1</td>
+      <td class="num">4</td>
+      <td style="min-width:120px"><div style="background:#F1F5F9;border-radius:4px;height:18px;position:relative;overflow:hidden">
+        <div style="background:#EF4444;height:100%;width:25%;border-radius:4px;transition:width .3s"></div>
+        <span style="position:absolute;left:6px;top:1px;font-size:10px;font-weight:700;color:#0F172A">25%</span>
+      </div></td>
+      <td style="font-size:11px">🔴 3 sales away</td>
+      <td class="num" style="font-size:11px;color:#64748B">10 sends</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Roy Boy_AT_19112025_Batch1_2K">Roy Boy_AT_19112025_Batch1_2K</td>
+      <td style="font-size:11px;color:#64748B">Austria</td>
+      <td class="num">10</td>
+      <td class="num">8</td>
+      <td class="num">€652</td>
+      <td class="num" style="font-size:11px;color:#64748B">€73</td>
+      <td class="num">6</td>
+      <td class="num">33</td>
+      <td style="min-width:120px"><div style="background:#F1F5F9;border-radius:4px;height:18px;position:relative;overflow:hidden">
+        <div style="background:#EF4444;height:100%;width:18%;border-radius:4px;transition:width .3s"></div>
+        <span style="position:absolute;left:6px;top:1px;font-size:10px;font-weight:700;color:#0F172A">18%</span>
+      </div></td>
+      <td style="font-size:11px">🔴 27 sales away</td>
+      <td class="num" style="font-size:11px;color:#64748B">46 sends</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Roy Boy_AU_12012026_4K">Roy Boy_AU_12012026_4K</td>
+      <td style="font-size:11px;color:#64748B">Australia</td>
+      <td class="num">6</td>
+      <td class="num">4</td>
+      <td class="num">€543</td>
+      <td class="num" style="font-size:11px;color:#64748B">€219</td>
+      <td class="num">5</td>
+      <td class="num">28</td>
+      <td style="min-width:120px"><div style="background:#F1F5F9;border-radius:4px;height:18px;position:relative;overflow:hidden">
+        <div style="background:#EF4444;height:100%;width:18%;border-radius:4px;transition:width .3s"></div>
+        <span style="position:absolute;left:6px;top:1px;font-size:10px;font-weight:700;color:#0F172A">18%</span>
+      </div></td>
+      <td style="font-size:11px">🔴 23 sales away</td>
+      <td class="num" style="font-size:11px;color:#64748B">28 sends</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Roy Boy_IT_12012026_4K">Roy Boy_IT_12012026_4K</td>
+      <td style="font-size:11px;color:#64748B">Italy</td>
+      <td class="num">6</td>
+      <td class="num">4</td>
+      <td class="num">€870</td>
+      <td class="num" style="font-size:11px;color:#64748B">€281</td>
+      <td class="num">7</td>
+      <td class="num">44</td>
+      <td style="min-width:120px"><div style="background:#F1F5F9;border-radius:4px;height:18px;position:relative;overflow:hidden">
+        <div style="background:#EF4444;height:100%;width:16%;border-radius:4px;transition:width .3s"></div>
+        <span style="position:absolute;left:6px;top:1px;font-size:10px;font-weight:700;color:#0F172A">16%</span>
+      </div></td>
+      <td style="font-size:11px">🔴 37 sales away</td>
+      <td class="num" style="font-size:11px;color:#64748B">32 sends</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Roy Boy_CH_19112025_Batch1_2K">Roy Boy_CH_19112025_Batch1_2K</td>
+      <td style="font-size:11px;color:#64748B">Switzerland</td>
+      <td class="num">8</td>
+      <td class="num">6</td>
+      <td class="num">€834</td>
+      <td class="num" style="font-size:11px;color:#64748B">€104</td>
+      <td class="num">6</td>
+      <td class="num">42</td>
+      <td style="min-width:120px"><div style="background:#F1F5F9;border-radius:4px;height:18px;position:relative;overflow:hidden">
+        <div style="background:#EF4444;height:100%;width:14%;border-radius:4px;transition:width .3s"></div>
+        <span style="position:absolute;left:6px;top:1px;font-size:10px;font-weight:700;color:#0F172A">14%</span>
+      </div></td>
+      <td style="font-size:11px">🔴 36 sales away</td>
+      <td class="num" style="font-size:11px;color:#64748B">49 sends</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Roy Boy_IT_19112025_Batch3_10K">Roy Boy_IT_19112025_Batch3_10K</td>
+      <td style="font-size:11px;color:#64748B">Italy</td>
+      <td class="num">6</td>
+      <td class="num">5</td>
+      <td class="num">€1,515</td>
+      <td class="num" style="font-size:11px;color:#64748B">€223</td>
+      <td class="num">10</td>
+      <td class="num">76</td>
+      <td style="min-width:120px"><div style="background:#F1F5F9;border-radius:4px;height:18px;position:relative;overflow:hidden">
+        <div style="background:#EF4444;height:100%;width:13%;border-radius:4px;transition:width .3s"></div>
+        <span style="position:absolute;left:6px;top:1px;font-size:10px;font-weight:700;color:#0F172A">13%</span>
+      </div></td>
+      <td style="font-size:11px">🔴 66 sales away</td>
+      <td class="num" style="font-size:11px;color:#64748B">40 sends</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Roy Boy_DE_12012026_5K">Roy Boy_DE_12012026_5K</td>
+      <td style="font-size:11px;color:#64748B">Germany</td>
+      <td class="num">6</td>
+      <td class="num">4</td>
+      <td class="num">€1,314</td>
+      <td class="num" style="font-size:11px;color:#64748B">€427</td>
+      <td class="num">7</td>
+      <td class="num">66</td>
+      <td style="min-width:120px"><div style="background:#F1F5F9;border-radius:4px;height:18px;position:relative;overflow:hidden">
+        <div style="background:#EF4444;height:100%;width:11%;border-radius:4px;transition:width .3s"></div>
+        <span style="position:absolute;left:6px;top:1px;font-size:10px;font-weight:700;color:#0F172A">11%</span>
+      </div></td>
+      <td style="font-size:11px">🔴 59 sales away</td>
+      <td class="num" style="font-size:11px;color:#64748B">51 sends</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Roy Boy - CH_Consol_22012026">Roy Boy - CH_Consol_22012026</td>
+      <td style="font-size:11px;color:#64748B">Switzerland</td>
+      <td class="num">6</td>
+      <td class="num">6</td>
+      <td class="num">€778</td>
+      <td class="num" style="font-size:11px;color:#64748B">—</td>
+      <td class="num">4</td>
+      <td class="num">39</td>
+      <td style="min-width:120px"><div style="background:#F1F5F9;border-radius:4px;height:18px;position:relative;overflow:hidden">
+        <div style="background:#EF4444;height:100%;width:10%;border-radius:4px;transition:width .3s"></div>
+        <span style="position:absolute;left:6px;top:1px;font-size:10px;font-weight:700;color:#0F172A">10%</span>
+      </div></td>
+      <td style="font-size:11px">🔴 35 sales away</td>
+      <td class="num" style="font-size:11px;color:#64748B">53 sends</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Roy Boy_IT_19112025_Batch2_10K">Roy Boy_IT_19112025_Batch2_10K</td>
+      <td style="font-size:11px;color:#64748B">Italy</td>
+      <td class="num">9</td>
+      <td class="num">7</td>
+      <td class="num">€2,459</td>
+      <td class="num" style="font-size:11px;color:#64748B">€626</td>
+      <td class="num">10</td>
+      <td class="num">123</td>
+      <td style="min-width:120px"><div style="background:#F1F5F9;border-radius:4px;height:18px;position:relative;overflow:hidden">
+        <div style="background:#EF4444;height:100%;width:8%;border-radius:4px;transition:width .3s"></div>
+        <span style="position:absolute;left:6px;top:1px;font-size:10px;font-weight:700;color:#0F172A">8%</span>
+      </div></td>
+      <td style="font-size:11px">🔴 113 sales away</td>
+      <td class="num" style="font-size:11px;color:#64748B">102 sends</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Roy Boy_IT_25082025_Batch1_10K">Roy Boy_IT_25082025_Batch1_10K</td>
+      <td style="font-size:11px;color:#64748B">Italy</td>
+      <td class="num">10</td>
+      <td class="num">8</td>
+      <td class="num">€3,751</td>
+      <td class="num" style="font-size:11px;color:#64748B">€425</td>
+      <td class="num">15</td>
+      <td class="num">188</td>
+      <td style="min-width:120px"><div style="background:#F1F5F9;border-radius:4px;height:18px;position:relative;overflow:hidden">
+        <div style="background:#EF4444;height:100%;width:8%;border-radius:4px;transition:width .3s"></div>
+        <span style="position:absolute;left:6px;top:1px;font-size:10px;font-weight:700;color:#0F172A">8%</span>
+      </div></td>
+      <td style="font-size:11px">🔴 173 sales away</td>
+      <td class="num" style="font-size:11px;color:#64748B">116 sends</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Roy Boy_AU_25082025_Batch1_10K">Roy Boy_AU_25082025_Batch1_10K</td>
+      <td style="font-size:11px;color:#64748B">Australia</td>
+      <td class="num">12</td>
+      <td class="num">9</td>
+      <td class="num">€2,620</td>
+      <td class="num" style="font-size:11px;color:#64748B">€120</td>
+      <td class="num">9</td>
+      <td class="num">131</td>
+      <td style="min-width:120px"><div style="background:#F1F5F9;border-radius:4px;height:18px;position:relative;overflow:hidden">
+        <div style="background:#EF4444;height:100%;width:7%;border-radius:4px;transition:width .3s"></div>
+        <span style="position:absolute;left:6px;top:1px;font-size:10px;font-weight:700;color:#0F172A">7%</span>
+      </div></td>
+      <td style="font-size:11px">🔴 122 sales away</td>
+      <td class="num" style="font-size:11px;color:#64748B">163 sends</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Lilly_AU_25082025_Batch1_10K">Lilly_AU_25082025_Batch1_10K</td>
+      <td style="font-size:11px;color:#64748B">Australia</td>
+      <td class="num">4</td>
+      <td class="num">4</td>
+      <td class="num">€730</td>
+      <td class="num" style="font-size:11px;color:#64748B">—</td>
+      <td class="num">2</td>
+      <td class="num">37</td>
+      <td style="min-width:120px"><div style="background:#F1F5F9;border-radius:4px;height:18px;position:relative;overflow:hidden">
+        <div style="background:#EF4444;height:100%;width:5%;border-radius:4px;transition:width .3s"></div>
+        <span style="position:absolute;left:6px;top:1px;font-size:10px;font-weight:700;color:#0F172A">5%</span>
+      </div></td>
+      <td style="font-size:11px">🔴 35 sales away</td>
+      <td class="num" style="font-size:11px;color:#64748B">71 sends</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Roy Boy - IT_Consol_22012026">Roy Boy - IT_Consol_22012026</td>
+      <td style="font-size:11px;color:#64748B">Italy</td>
+      <td class="num">7</td>
+      <td class="num">6</td>
+      <td class="num">€1,136</td>
+      <td class="num" style="font-size:11px;color:#64748B">—</td>
+      <td class="num">3</td>
+      <td class="num">57</td>
+      <td style="min-width:120px"><div style="background:#F1F5F9;border-radius:4px;height:18px;position:relative;overflow:hidden">
+        <div style="background:#EF4444;height:100%;width:5%;border-radius:4px;transition:width .3s"></div>
+        <span style="position:absolute;left:6px;top:1px;font-size:10px;font-weight:700;color:#0F172A">5%</span>
+      </div></td>
+      <td style="font-size:11px">🔴 54 sales away</td>
+      <td class="num" style="font-size:11px;color:#64748B">127 sends</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Roy Boy - IE_Consol_22012026">Roy Boy - IE_Consol_22012026</td>
+      <td style="font-size:11px;color:#64748B">Ireland</td>
+      <td class="num">6</td>
+      <td class="num">5</td>
+      <td class="num">€466</td>
+      <td class="num" style="font-size:11px;color:#64748B">—</td>
+      <td class="num">1</td>
+      <td class="num">24</td>
+      <td style="min-width:120px"><div style="background:#F1F5F9;border-radius:4px;height:18px;position:relative;overflow:hidden">
+        <div style="background:#EF4444;height:100%;width:4%;border-radius:4px;transition:width .3s"></div>
+        <span style="position:absolute;left:6px;top:1px;font-size:10px;font-weight:700;color:#0F172A">4%</span>
+      </div></td>
+      <td style="font-size:11px">🔴 23 sales away</td>
+      <td class="num" style="font-size:11px;color:#64748B">139 sends</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Roy Boy_DE_19112025_Batch1_10K">Roy Boy_DE_19112025_Batch1_10K</td>
+      <td style="font-size:11px;color:#64748B">Germany</td>
+      <td class="num">12</td>
+      <td class="num">8</td>
+      <td class="num">€4,188</td>
+      <td class="num" style="font-size:11px;color:#64748B">€495</td>
+      <td class="num">7</td>
+      <td class="num">210</td>
+      <td style="min-width:120px"><div style="background:#F1F5F9;border-radius:4px;height:18px;position:relative;overflow:hidden">
+        <div style="background:#EF4444;height:100%;width:3%;border-radius:4px;transition:width .3s"></div>
+        <span style="position:absolute;left:6px;top:1px;font-size:10px;font-weight:700;color:#0F172A">3%</span>
+      </div></td>
+      <td style="font-size:11px">🔴 203 sales away</td>
+      <td class="num" style="font-size:11px;color:#64748B">349 sends</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Lilly_DE_SMSedge_Batch1_10K">Lilly_DE_SMSedge_Batch1_10K</td>
+      <td style="font-size:11px;color:#64748B">Germany</td>
+      <td class="num">5</td>
+      <td class="num">4</td>
+      <td class="num">€2,044</td>
+      <td class="num" style="font-size:11px;color:#64748B">€421</td>
+      <td class="num">3</td>
+      <td class="num">103</td>
+      <td style="min-width:120px"><div style="background:#F1F5F9;border-radius:4px;height:18px;position:relative;overflow:hidden">
+        <div style="background:#EF4444;height:100%;width:3%;border-radius:4px;transition:width .3s"></div>
+        <span style="position:absolute;left:6px;top:1px;font-size:10px;font-weight:700;color:#0F172A">3%</span>
+      </div></td>
+      <td style="font-size:11px">🔴 100 sales away</td>
+      <td class="num" style="font-size:11px;color:#64748B">167 sends</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Roy Boy - DE_Consol_22012026">Roy Boy - DE_Consol_22012026</td>
+      <td style="font-size:11px;color:#64748B">Germany</td>
+      <td class="num">6</td>
+      <td class="num">5</td>
+      <td class="num">€1,704</td>
+      <td class="num" style="font-size:11px;color:#64748B">—</td>
+      <td class="num">2</td>
+      <td class="num">86</td>
+      <td style="min-width:120px"><div style="background:#F1F5F9;border-radius:4px;height:18px;position:relative;overflow:hidden">
+        <div style="background:#EF4444;height:100%;width:2%;border-radius:4px;transition:width .3s"></div>
+        <span style="position:absolute;left:6px;top:1px;font-size:10px;font-weight:700;color:#0F172A">2%</span>
+      </div></td>
+      <td style="font-size:11px">🔴 84 sales away</td>
+      <td class="num" style="font-size:11px;color:#64748B">253 sends</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Roy Boy - NO_Consol_22012026">Roy Boy - NO_Consol_22012026</td>
+      <td style="font-size:11px;color:#64748B">Norway</td>
+      <td class="num">5</td>
+      <td class="num">5</td>
+      <td class="num">€855</td>
+      <td class="num" style="font-size:11px;color:#64748B">—</td>
+      <td class="num">1</td>
+      <td class="num">43</td>
+      <td style="min-width:120px"><div style="background:#F1F5F9;border-radius:4px;height:18px;position:relative;overflow:hidden">
+        <div style="background:#EF4444;height:100%;width:2%;border-radius:4px;transition:width .3s"></div>
+        <span style="position:absolute;left:6px;top:1px;font-size:10px;font-weight:700;color:#0F172A">2%</span>
+      </div></td>
+      <td style="font-size:11px">🔴 42 sales away</td>
+      <td class="num" style="font-size:11px;color:#64748B">211 sends</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Roy Boy_NO_12012026_1.7K">Roy Boy_NO_12012026_1.7K</td>
+      <td style="font-size:11px;color:#64748B">Norway</td>
+      <td class="num">6</td>
+      <td class="num">3</td>
+      <td class="num">€363</td>
+      <td class="num" style="font-size:11px;color:#64748B">€192</td>
+      <td class="num">0</td>
+      <td class="num">19</td>
+      <td style="min-width:120px"><div style="background:#F1F5F9;border-radius:4px;height:18px;position:relative;overflow:hidden">
+        <div style="background:#EF4444;height:100%;width:0%;border-radius:4px;transition:width .3s"></div>
+        <span style="position:absolute;left:6px;top:1px;font-size:10px;font-weight:700;color:#0F172A">0%</span>
+      </div></td>
+      <td style="font-size:11px">🔴 19 sales away</td>
+      <td class="num" style="font-size:11px;color:#64748B">—</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Artium_AU_13032026">Artium_AU_13032026</td>
+      <td style="font-size:11px;color:#64748B">Australia</td>
+      <td class="num">1</td>
+      <td class="num">1</td>
+      <td class="num">€0</td>
+      <td class="num" style="font-size:11px;color:#64748B">—</td>
+      <td class="num">0</td>
+      <td class="num">0</td>
+      <td style="min-width:120px"><div style="background:#F1F5F9;border-radius:4px;height:18px;position:relative;overflow:hidden">
+        <div style="background:#EF4444;height:100%;width:0%;border-radius:4px;transition:width .3s"></div>
+        <span style="position:absolute;left:6px;top:1px;font-size:10px;font-weight:700;color:#0F172A">0%</span>
+      </div></td>
+      <td style="font-size:11px">🔴 0 sales away</td>
+      <td class="num" style="font-size:11px;color:#64748B">—</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Artium_DE_13032026">Artium_DE_13032026</td>
+      <td style="font-size:11px;color:#64748B">Germany, Italy</td>
+      <td class="num">4</td>
+      <td class="num">3</td>
+      <td class="num">€150</td>
+      <td class="num" style="font-size:11px;color:#64748B">—</td>
+      <td class="num">0</td>
+      <td class="num">8</td>
+      <td style="min-width:120px"><div style="background:#F1F5F9;border-radius:4px;height:18px;position:relative;overflow:hidden">
+        <div style="background:#EF4444;height:100%;width:0%;border-radius:4px;transition:width .3s"></div>
+        <span style="position:absolute;left:6px;top:1px;font-size:10px;font-weight:700;color:#0F172A">0%</span>
+      </div></td>
+      <td style="font-size:11px">🔴 8 sales away</td>
+      <td class="num" style="font-size:11px;color:#64748B">—</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Roy Boy - CA_Consol_22012026">Roy Boy - CA_Consol_22012026</td>
+      <td style="font-size:11px;color:#64748B">Canada</td>
+      <td class="num">2</td>
+      <td class="num">2</td>
+      <td class="num">€88</td>
+      <td class="num" style="font-size:11px;color:#64748B">—</td>
+      <td class="num">0</td>
+      <td class="num">5</td>
+      <td style="min-width:120px"><div style="background:#F1F5F9;border-radius:4px;height:18px;position:relative;overflow:hidden">
+        <div style="background:#EF4444;height:100%;width:0%;border-radius:4px;transition:width .3s"></div>
+        <span style="position:absolute;left:6px;top:1px;font-size:10px;font-weight:700;color:#0F172A">0%</span>
+      </div></td>
+      <td style="font-size:11px">🔴 5 sales away</td>
+      <td class="num" style="font-size:11px;color:#64748B">—</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Lilly_NZ_SMSedge_Batch1_10K">Lilly_NZ_SMSedge_Batch1_10K</td>
+      <td style="font-size:11px;color:#64748B">New Zealand</td>
+      <td class="num">2</td>
+      <td class="num">2</td>
+      <td class="num">€276</td>
+      <td class="num" style="font-size:11px;color:#64748B">—</td>
+      <td class="num">0</td>
+      <td class="num">14</td>
+      <td style="min-width:120px"><div style="background:#F1F5F9;border-radius:4px;height:18px;position:relative;overflow:hidden">
+        <div style="background:#EF4444;height:100%;width:0%;border-radius:4px;transition:width .3s"></div>
+        <span style="position:absolute;left:6px;top:1px;font-size:10px;font-weight:700;color:#0F172A">0%</span>
+      </div></td>
+      <td style="font-size:11px">🔴 14 sales away</td>
+      <td class="num" style="font-size:11px;color:#64748B">—</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Lilly_DE_25082025_Batch1_10K">Lilly_DE_25082025_Batch1_10K</td>
+      <td style="font-size:11px;color:#64748B">Germany</td>
+      <td class="num">1</td>
+      <td class="num">1</td>
+      <td class="num">€225</td>
+      <td class="num" style="font-size:11px;color:#64748B">—</td>
+      <td class="num">0</td>
+      <td class="num">12</td>
+      <td style="min-width:120px"><div style="background:#F1F5F9;border-radius:4px;height:18px;position:relative;overflow:hidden">
+        <div style="background:#EF4444;height:100%;width:0%;border-radius:4px;transition:width .3s"></div>
+        <span style="position:absolute;left:6px;top:1px;font-size:10px;font-weight:700;color:#0F172A">0%</span>
+      </div></td>
+      <td style="font-size:11px">🔴 12 sales away</td>
+      <td class="num" style="font-size:11px;color:#64748B">—</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Lilly_DE_07112025_Batch1_10K">Lilly_DE_07112025_Batch1_10K</td>
+      <td style="font-size:11px;color:#64748B">Germany</td>
+      <td class="num">1</td>
+      <td class="num">1</td>
+      <td class="num">€199</td>
+      <td class="num" style="font-size:11px;color:#64748B">—</td>
+      <td class="num">0</td>
+      <td class="num">10</td>
+      <td style="min-width:120px"><div style="background:#F1F5F9;border-radius:4px;height:18px;position:relative;overflow:hidden">
+        <div style="background:#EF4444;height:100%;width:0%;border-radius:4px;transition:width .3s"></div>
+        <span style="position:absolute;left:6px;top:1px;font-size:10px;font-weight:700;color:#0F172A">0%</span>
+      </div></td>
+      <td style="font-size:11px">🔴 10 sales away</td>
+      <td class="num" style="font-size:11px;color:#64748B">—</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Lilly_CA_SMSedge_Batch1_10K">Lilly_CA_SMSedge_Batch1_10K</td>
+      <td style="font-size:11px;color:#64748B">Canada</td>
+      <td class="num">1</td>
+      <td class="num">1</td>
+      <td class="num">€88</td>
+      <td class="num" style="font-size:11px;color:#64748B">—</td>
+      <td class="num">0</td>
+      <td class="num">5</td>
+      <td style="min-width:120px"><div style="background:#F1F5F9;border-radius:4px;height:18px;position:relative;overflow:hidden">
+        <div style="background:#EF4444;height:100%;width:0%;border-radius:4px;transition:width .3s"></div>
+        <span style="position:absolute;left:6px;top:1px;font-size:10px;font-weight:700;color:#0F172A">0%</span>
+      </div></td>
+      <td style="font-size:11px">🔴 5 sales away</td>
+      <td class="num" style="font-size:11px;color:#64748B">—</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="IE_Consol_22012026">IE_Consol_22012026</td>
+      <td style="font-size:11px;color:#64748B">Ireland</td>
+      <td class="num">1</td>
+      <td class="num">1</td>
+      <td class="num">€77</td>
+      <td class="num" style="font-size:11px;color:#64748B">—</td>
+      <td class="num">0</td>
+      <td class="num">4</td>
+      <td style="min-width:120px"><div style="background:#F1F5F9;border-radius:4px;height:18px;position:relative;overflow:hidden">
+        <div style="background:#EF4444;height:100%;width:0%;border-radius:4px;transition:width .3s"></div>
+        <span style="position:absolute;left:6px;top:1px;font-size:10px;font-weight:700;color:#0F172A">0%</span>
+      </div></td>
+      <td style="font-size:11px">🔴 4 sales away</td>
+      <td class="num" style="font-size:11px;color:#64748B">—</td>
+    </tr><tr>
+      <td style="font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Roy Roy Boy_NO_12012026_1.7K">Roy Roy Boy_NO_12012026_1.7K</td>
+      <td style="font-size:11px;color:#64748B">Norway</td>
+      <td class="num">1</td>
+      <td class="num">1</td>
+      <td class="num">€77</td>
+      <td class="num" style="font-size:11px;color:#64748B">—</td>
+      <td class="num">0</td>
+      <td class="num">4</td>
+      <td style="min-width:120px"><div style="background:#F1F5F9;border-radius:4px;height:18px;position:relative;overflow:hidden">
+        <div style="background:#EF4444;height:100%;width:0%;border-radius:4px;transition:width .3s"></div>
+        <span style="position:absolute;left:6px;top:1px;font-size:10px;font-weight:700;color:#0F172A">0%</span>
+      </div></td>
+      <td style="font-size:11px">🔴 4 sales away</td>
+      <td class="num" style="font-size:11px;color:#64748B">—</td>
+    </tr></tbody></table></div>
+    </div>
+
+    <!-- LIST × BRAND × COUNTRY COMBOS -->
+    <div class="card" style="margin-bottom:24px">
+      <div class="card-header">
+        <div>
+          <div class="card-title">List × Brand × Country Performance</div>
+          <div class="card-subtitle">128 unique combos — find which list+brand+country works best. Sort by any column.</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input class="search" id="comboSearch" placeholder="Filter by list, brand, or country..." oninput="renderComboTable()" style="width:300px">
+        </div>
+      </div>
+      <table id="comboTable">
+        <thead><tr>
+          <th onclick="sortCombo('list')">List</th>
+          <th onclick="sortCombo('brand')">Brand</th>
+          <th onclick="sortCombo('country')">Country</th>
+          <th onclick="sortCombo('sends')">Sends</th>
+          <th onclick="sortCombo('clicks')">Clicks</th>
+          <th onclick="sortCombo('ctr')">CTR</th>
+          <th onclick="sortCombo('leads')">Leads</th>
+          <th onclick="sortCombo('cl2l')">Cl→Reg</th>
+          <th onclick="sortCombo('sales')">Sales</th>
+          <th onclick="sortCombo('l2s')">Reg→FTD</th>
+          <th onclick="sortCombo('cost')">Cost</th>
+          <th onclick="sortCombo('cpa')">CPA</th>
+          <th onclick="sortCombo('roi')">ROI</th>
+        </tr></thead>
+        <tbody id="comboTbody"></tbody>
+      </table>
+      <div class="pagination" id="comboPagination"></div>
+    </div>
+
+    <!-- CLICKED vs FRESH -->
+    <div class="grid-13">
+      <div class="card">
+        <div class="card-header"><div><div class="card-title">Campaign Types</div></div></div>
+        <div style="position:relative;height:180px"><canvas id="chartTypePie"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div><div class="card-title">Fresh vs Clicked Performance</div><div class="card-subtitle">Retargeted (Clicked) campaigns consistently outperform fresh lists</div></div></div>
+        <div class="chart-wrap-sm"><canvas id="chartFreshVsClicked"></canvas></div>
+      </div>
+    </div>
+
+  </div><!-- /overview -->
+
+  <!-- ════════════ PAGE: COUNTRIES ════════════ -->
+  <div class="page" id="page-countries">
+    <div class="grid-2" style="margin-bottom:0">
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header"><div><div class="card-title">CTR % by Country</div></div></div>
+        <div class="chart-wrap"><canvas id="chartCTRCountry2"></canvas></div>
+      </div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header"><div><div class="card-title">ROI % by Country</div></div></div>
+        <div class="chart-wrap"><canvas id="chartROICountry"></canvas></div>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:24px">
+      <div class="card-header"><div><div class="card-title">Country Breakdown</div><div class="card-subtitle">10 countries</div></div></div>
+      <table>
+        <thead><tr><th>Country</th><th>Campaigns</th><th>Sent</th><th>Clicks</th><th>CTR</th><th>Leads</th><th>Cl→Lead</th><th>Sales</th><th>Lead→Sale</th><th>Cost</th><th>€/Click</th><th>€/Campaign</th><th>Revenue</th><th>ROI</th></tr></thead>
+        <tbody id="countryTbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ════════════ PAGE: BRANDS ════════════ -->
+  <div class="page" id="page-brands">
+    <div class="grid-2" style="margin-bottom:0">
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header"><div><div class="card-title">Sales by Brand</div></div></div>
+        <div class="chart-wrap"><canvas id="chartBrandSales2"></canvas></div>
+      </div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header"><div><div class="card-title">CTR % by Brand</div></div></div>
+        <div class="chart-wrap"><canvas id="chartBrandCTR2"></canvas></div>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:24px">
+      <div class="card-header"><div><div class="card-title">Brand Breakdown</div></div></div>
+      <table>
+        <thead><tr><th>Brand</th><th>Campaigns</th><th>Sent</th><th>Clicks</th><th>CTR</th><th>Leads</th><th>Cl→Lead</th><th>Sales</th><th>Lead→Sale</th><th>Cost</th><th>Revenue</th><th>ROI</th></tr></thead>
+        <tbody id="brandTbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ════════════ PAGE: LISTS ════════════ -->
+  <div class="page" id="page-lists">
+    <div class="alert alert-info">
+      <div class="alert-icon">📋</div>
+      <div><strong>Scoring logic:</strong> "Use Again" considers multiple factors — ROI, CTR vs median, click→lead rate (&gt;10%), lead volume (&gt;20 leads), and whether the list generated sales. A list with negative ROI but strong lead generation may still be worth reusing if your retention team can convert those leads.</div>
+    </div>
+    <!-- Funnel chart for lists -->
+    <div class="grid-2" style="margin-bottom:0">
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header"><div><div class="card-title">Click → Lead Rate by List</div><div class="card-subtitle">Which lists produce the most registrations per click?</div></div></div>
+        <div class="chart-wrap"><canvas id="chartListFunnel"></canvas></div>
+      </div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header"><div><div class="card-title">Cost per Lead by List</div><div class="card-subtitle">Lower = more efficient lead acquisition. Key metric for retention ROI.</div></div></div>
+        <div class="chart-wrap"><canvas id="chartListCPL"></canvas></div>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:24px">
+      <div class="table-controls">
+        <div class="card-title">All Lists (30)</div>
+        <div style="display:flex;gap:10px;align-items:center">
+          <select id="listReuse" onchange="renderListTable()" style="border:1.5px solid #E2E8F0;border-radius:8px;padding:6px 10px;font-size:12px;font-family:inherit;background:#F8FAFC;cursor:pointer">
+            <option value="">All Recommendations</option>
+            <option value="Yes">✓ Yes</option>
+            <option value="Maybe">⚠ Maybe</option>
+            <option value="No">✗ No</option>
+          </select>
+          <input class="search" id="listSearch" placeholder="Search lists..." oninput="renderListTable()">
+        </div>
+      </div>
+      <table id="listTable">
+        <thead><tr>
+          <th onclick="sortList('list')">List Name</th>
+          <th onclick="sortList('countries')">Countries</th>
+          <th onclick="sortList('camps')">Campaigns</th>
+          <th onclick="sortList('sent')">Sent</th>
+          <th onclick="sortList('clicks')">Clicks</th>
+          <th onclick="sortList('ctr')">CTR</th>
+          <th onclick="sortList('leads')">Leads</th>
+          <th onclick="sortList('click_to_lead')">Cl→Lead</th>
+          <th onclick="sortList('sales')">Sales</th>
+          <th onclick="sortList('lead_to_sale')">Lead→Sale</th>
+          <th onclick="sortList('cost')">Cost</th>
+          <th onclick="sortList('cost_per_lead')">Cost/Lead</th>
+          <th onclick="sortList('roi')">ROI</th>
+          <th onclick="sortList('laps')">Laps</th>
+          <th onclick="sortList('reuse')">Use Again?</th>
+        </tr></thead>
+        <tbody id="listTbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ════════════ PAGE: CAMPAIGNS ════════════ -->
+  <div class="page" id="page-campaigns">
+    <div class="card" style="margin-bottom:24px">
+      <div class="table-controls">
+        <div class="card-title">All Campaigns</div>
+        <input class="search" id="campSearch" placeholder="Search campaigns..." oninput="renderCampTable()">
+      </div>
+      <table id="campTable">
+        <thead><tr>
+          <th onclick="sortCamp('name')">Campaign</th>
+          <th onclick="sortCamp('country')">Country</th>
+          <th onclick="sortCamp('brand')">Brand</th>
+          <th onclick="sortCamp('type')">Type</th>
+          <th onclick="sortCamp('sent')">Sent</th>
+          <th onclick="sortCamp('clicks')">Clicks</th>
+          <th onclick="sortCamp('ctr')">CTR</th>
+          <th onclick="sortCamp('sales')">Sales</th>
+          <th onclick="sortCamp('cost')">Cost</th>
+          <th onclick="sortCamp('roi')">ROI</th>
+          <th onclick="sortCamp('cpa')">CPA</th>
+          <th onclick="sortCamp('profitable')">Status</th>
+        </tr></thead>
+        <tbody id="campTbody"></tbody>
+      </table>
+      <div class="pagination" id="pagination"></div>
+    </div>
+  </div>
+
+  <!-- ════════════ PAGE: CONTENT TRACKER ════════════ -->
+  <div class="page" id="page-content">
+    <div class="alert alert-info">
+      <div class="alert-icon">📝</div>
+      <div><strong>Content Tracker:</strong> Campaigns with high clicks are flagged 🔥 so you can investigate WHY they performed well. Paste the SMS copy into the text box and add notes. Data is saved in your browser for this session — use "Export CSV" to save permanently.<br><strong>Note:</strong> SMS content cannot be extracted directly from the platform (text report only). You will need to manually extract and paste the SMS copy from each campaign.</div>
+    </div>
+
+    <!-- CONTENT OPTIMIZATION GUIDE -->
+    <div class="grid-2" style="margin-bottom:16px">
+      <div class="card">
+        <div class="card-header"><div><div class="card-title">SMS Copy Best Practices</div><div class="card-subtitle">Guidelines for optimizing campaign content</div></div></div>
+        <div style="font-size:13px;color:#334155;line-height:1.7;padding:4px 0">
+          <p style="margin-bottom:10px"><strong style="color:#16A34A">What works:</strong> Short messages (under 160 chars), strong CTA, urgency/scarcity, personalization, local language, clear bonus offers, casino name + welcome bonus amount.</p>
+          <p style="margin-bottom:10px"><strong style="color:#F59E0B">Test these:</strong> Different send times (6-10pm local), sender ID rotation, emoji vs no emoji, question openers vs statement openers.</p>
+          <p><strong style="color:#DC2626">Avoid:</strong> All caps, spammy words (FREE!!!, CLICK NOW), broken links, wrong language for country, generic copy across all GEOs.</p>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div><div class="card-title">Content to Review</div><div class="card-subtitle">Placeholder — paste actual SMS copy below when available</div></div></div>
+        <div style="font-size:13px;color:#64748B;line-height:1.7">
+          <div style="background:#F8FAFC;border-radius:8px;padding:12px;margin-bottom:8px;border-left:3px solid #16A34A">
+            <div style="font-size:11px;font-weight:700;color:#16A34A;margin-bottom:4px">TOP PERFORMER — KEEP</div>
+            <div style="color:#334155;font-style:italic">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus lacinia odio vitae vestibulum. 🎰 Bonus: €200!</div>
+          </div>
+          <div style="background:#F8FAFC;border-radius:8px;padding:12px;margin-bottom:8px;border-left:3px solid #F59E0B">
+            <div style="font-size:11px;font-weight:700;color:#F59E0B;margin-bottom:4px">NEEDS OPTIMIZATION</div>
+            <div style="color:#334155;font-style:italic">Lorem ipsum dolor sit amet, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</div>
+          </div>
+          <div style="background:#F8FAFC;border-radius:8px;padding:12px;border-left:3px solid #DC2626">
+            <div style="font-size:11px;font-weight:700;color:#DC2626;margin-bottom:4px">REPLACE — LOW CTR</div>
+            <div style="color:#334155;font-style:italic">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut enim ad minim veniam.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:24px">
+      <div class="content-bar">
+        <div class="card-title">Campaign Content Analysis</div>
+        <div class="content-stat">🔥 <strong id="highClickCount">0</strong> high-click campaigns</div>
+        <div class="content-stat">📝 <strong id="contentFilledCount">0</strong> with content logged</div>
+        <div style="flex:1"></div>
+        <select id="contentFilter" onchange="renderContentTable()" style="border:1.5px solid #E2E8F0;border-radius:8px;padding:6px 10px;font-size:12px;font-family:inherit;background:#F8FAFC;cursor:pointer">
+          <option value="high">🔥 High Clicks Only</option>
+          <option value="all">All Campaigns</option>
+          <option value="logged">With Content Logged</option>
+          <option value="empty">Missing Content</option>
+        </select>
+        <button class="content-export-btn" onclick="exportContentCSV()">↓ Export CSV</button>
+      </div>
+      <table id="contentTable">
+        <thead><tr>
+          <th style="width:50px">Flag</th>
+          <th onclick="sortContent('name')">Campaign</th>
+          <th onclick="sortContent('country')">Country</th>
+          <th onclick="sortContent('brand')">Brand</th>
+          <th onclick="sortContent('clicks')">Clicks</th>
+          <th onclick="sortContent('ctr')">CTR</th>
+          <th onclick="sortContent('sales')">Sales</th>
+          <th class="content-cell">SMS Copy</th>
+          <th class="content-cell">Notes</th>
+        </tr></thead>
+        <tbody id="contentTbody"></tbody>
+      </table>
+      <div class="pagination" id="contentPagination"></div>
+    </div>
+  </div>
+
+  <!-- ════════════ PAGE: QUESTIONS ════════════ -->
+  <div class="page" id="page-questions">
+    <div class="alert alert-info" style="margin-bottom:16px">
+      <div class="alert-icon">📋</div>
+      <div><strong>AM Meeting Notes (Ani):</strong> Updated with answers from the account manager meeting. Green = answered, yellow = partially answered, red = still open.</div>
+    </div>
+    <div class="card" style="margin-bottom:24px">
+      <div class="card-header"><div><div class="card-title">Questions &amp; AM Answers</div><div class="card-subtitle">Updated from AM meeting — some items now resolved</div></div></div>
+      <table>
+        <thead><tr><th style="width:40px">#</th><th>Question</th><th>AM Answer / Status</th><th style="width:80px">Status</th></tr></thead>
+        <tbody>
+          <tr style="background:#F0FDF4"><td>1</td><td style="font-weight:600">Clicked campaigns — which list was used?</td><td style="color:#334155"><strong>Answered:</strong> "Clicked" = retargeted from all-time clickers across all previous sends. Not tied to a specific list — it's everyone who ever clicked on any campaign for that brand+country combo.</td><td><span class="badge badge-yes">Resolved</span></td></tr>
+          <tr style="background:#F0FDF4"><td>2</td><td style="font-weight:600">How many times can we reuse a list?</td><td style="color:#334155"><strong>Answered:</strong> Use each list 3-4 times, then give a cool-off period before reusing. Rotate across different brands. Don't spam registered users — exclude them from future sends.</td><td><span class="badge badge-yes">Resolved</span></td></tr>
+          <tr style="background:#F0FDF4"><td>3</td><td style="font-weight:600">What to do with big lists that have low vs good data?</td><td style="color:#334155"><strong>Answered:</strong> If list is big with low data → extract the good contacts (clickers/registrants). If big with good data → resend to everyone, but always exclude already-registered users.</td><td><span class="badge badge-yes">Resolved</span></td></tr>
+          <tr style="background:#F0FDF4"><td>4</td><td style="font-weight:600">How to test new lists / routes?</td><td style="color:#334155"><strong>Answered:</strong> Test 300-500 contacts first, then scale if it works. Do laps with the same routes that performed well. Routes matter as much as lists.</td><td><span class="badge badge-yes">Resolved</span></td></tr>
+          <tr style="background:#FEF9C3"><td>5</td><td style="font-weight:600">How to download campaign content / SMS copy?</td><td style="color:#334155"><strong>Partially answered:</strong> Cannot extract SMS content directly from the platform — only available as a text report. Need to manually copy from each campaign. AM (Ani) confirmed this is a platform limitation.</td><td><span class="badge badge-maybe">Partial</span></td></tr>
+          <tr style="background:#FEF9C3"><td>6</td><td style="font-weight:600">Average CTR benchmarks &amp; good route numbers?</td><td style="color:#334155"><strong>Pending from AM:</strong> Ani will share average CTR benchmarks and good route performance numbers. Waiting on this data to update our benchmark tables.</td><td><span class="badge badge-maybe">Waiting</span></td></tr>
+          <tr><td>7</td><td style="font-weight:600">Why does Norway CTR not convert?</td><td style="color:#64748B"><strong>Still open:</strong> 9–11% CTR across every brand, near-zero sales. Likely fake clicks or broken landing page for NO. Need to investigate with AM.</td><td><span class="badge badge-no">Open</span></td></tr>
+          <tr><td>8</td><td style="font-weight:600">Is €20 the right average sale value?</td><td style="color:#64748B"><strong>Still open:</strong> Overall ROI is negative at €20/sale. If using LTV or revenue share rather than first deposit, numbers change dramatically. Need to confirm with finance.</td><td><span class="badge badge-no">Open</span></td></tr>
+          <tr><td>9</td><td style="font-weight:600">What are the new Artium lists?</td><td style="color:#64748B"><strong>Still open:</strong> Appeared Mar 2026. New provider? Same pricing as Royboy/Lilly?</td><td><span class="badge badge-no">Open</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /content -->
+
+<script src="script.js"></script>
+</body>
+</html>
