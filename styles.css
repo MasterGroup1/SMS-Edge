@@ -273,9 +273,124 @@ td.num{text-align:right;font-variant-numeric:tabular-nums}
 .content-stat{font-size:12px;color:#64748B;font-weight:500}
 .content-stat strong{color:#0F172A}
 
-/* ── RESPONSIVE ────────────────────────── */
-@media(max-width:1200px){.kpi-row{grid-template-columns:repeat(2,1fr)} .grid-2,.grid-3{grid-template-columns:1fr}}
-@media(max-width:900px){.sidebar{display:none} .content{margin-left:0}}
+/* ── MOBILE MENU TOGGLE ───────────────── */
+.mobile-menu-btn{
+  display:none;align-items:center;justify-content:center;
+  width:40px;height:40px;border-radius:10px;border:1.5px solid #E2E8F0;
+  background:#fff;cursor:pointer;flex-shrink:0;transition:all .15s;
+}
+.mobile-menu-btn:hover{background:#F1F5F9;border-color:#3B82F6}
+.mobile-menu-btn svg{width:20px;height:20px;color:#334155}
+.sidebar-overlay{
+  display:none;position:fixed;inset:0;background:rgba(15,23,42,0.5);
+  z-index:199;opacity:0;transition:opacity .25s;
+}
+.sidebar-overlay.show{display:block;opacity:1}
+.sidebar-close{
+  display:none;position:absolute;top:16px;right:16px;
+  width:32px;height:32px;border-radius:8px;border:none;
+  background:#1E293B;color:#94A3B8;cursor:pointer;
+  font-size:18px;align-items:center;justify-content:center;
+  transition:all .15s;
+}
+.sidebar-close:hover{background:#334155;color:#E2E8F0}
+
+/* ── RESPONSIVE: TABLET (≤1200px) ─────── */
+@media(max-width:1200px){
+  .kpi-row{grid-template-columns:repeat(2,1fr)}
+  .grid-2,.grid-3,.grid-13,.grid-31{grid-template-columns:1fr}
+  .topbar{padding:14px 20px}
+  .topbar-right{gap:8px}
+  .topbar-right select{font-size:11px;padding:6px 8px;min-width:0!important}
+  .page{padding:20px}
+  .tabs{padding:0 20px}
+  .search{width:200px}
+}
+
+/* ── RESPONSIVE: SMALL TABLET (≤900px) ── */
+@media(max-width:900px){
+  /* sidebar becomes a slide-out drawer */
+  .sidebar{
+    transform:translateX(-100%);transition:transform .3s ease;
+  }
+  .sidebar.open{transform:translateX(0)}
+  .sidebar-close{display:flex}
+  .sidebar-overlay.show{display:block}
+  .content{margin-left:0}
+
+  /* show hamburger */
+  .mobile-menu-btn{display:flex}
+
+  /* topbar stacks */
+  .topbar{flex-wrap:wrap;gap:12px;padding:12px 16px}
+  .topbar-left h1{font-size:17px}
+  .topbar-left p{font-size:11px}
+  .topbar-right{width:100%;overflow-x:auto;gap:8px;padding-bottom:4px;-webkit-overflow-scrolling:touch}
+
+  /* grids all single-col */
+  .kpi-row{grid-template-columns:repeat(2,1fr);gap:12px}
+  .grid-2,.grid-3,.grid-13,.grid-31{grid-template-columns:1fr;gap:12px}
+
+  .page{padding:16px}
+  .tabs{padding:0 16px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .tab{padding:10px 14px;font-size:12px;white-space:nowrap}
+
+  /* table horizontal scroll */
+  .card{padding:16px;overflow-x:auto}
+  table{min-width:600px}
+
+  .chart-wrap{height:220px}
+  .chart-wrap-sm{height:180px}
+}
+
+/* ── RESPONSIVE: MOBILE (≤600px) ─────── */
+@media(max-width:600px){
+  .kpi-row{grid-template-columns:1fr;gap:10px;margin-bottom:16px}
+  .kpi-card{padding:16px 18px}
+  .kpi-value{font-size:24px}
+  .kpi-icon{width:34px;height:34px;font-size:15px;top:14px;right:14px;border-radius:8px}
+
+  .topbar{padding:10px 12px;gap:10px}
+  .topbar-left h1{font-size:15px}
+  .topbar-left p{font-size:10px}
+  .topbar-right select{font-size:11px;padding:5px 6px}
+  .topbar-btn{padding:6px 12px;font-size:11px}
+
+  .page{padding:12px}
+  .grid-2,.grid-3,.grid-13,.grid-31{gap:10px;margin-bottom:16px}
+
+  .card{padding:14px;border-radius:10px}
+  .card-header{flex-wrap:wrap;gap:8px;margin-bottom:12px}
+  .card-title{font-size:13px}
+  .card-subtitle{font-size:10px}
+
+  .chart-wrap{height:200px}
+  .chart-wrap-sm{height:160px}
+
+  .search{width:100%}
+  .table-controls{flex-direction:column;align-items:stretch;gap:8px}
+
+  .alert{padding:12px 14px;font-size:12px;border-radius:8px}
+
+  .tabs{gap:0;padding:0 12px}
+  .tab{padding:10px 12px;font-size:11px}
+
+  .pagination{justify-content:center;flex-wrap:wrap}
+
+  .dropzone{padding:20px;border-radius:10px}
+  .dropzone-icon{font-size:28px}
+  .dropzone-title{font-size:13px}
+  .dropzone-sub{font-size:11px}
+
+  .content-cell{min-width:160px;max-width:240px}
+  .content-bar{gap:6px}
+  .content-stat{font-size:11px}
+
+  /* date filter stacks on mobile */
+  .topbar-right > div:first-child{
+    width:100%;flex-wrap:wrap;gap:4px;
+  }
+}
 
 /* ── SCROLLBAR ─────────────────────────── */
 ::-webkit-scrollbar{width:5px;height:5px}

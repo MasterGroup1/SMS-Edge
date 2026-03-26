@@ -11,7 +11,9 @@
 <body>
 
 <!-- SIDEBAR -->
-<aside class="sidebar">
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+<aside class="sidebar" id="sidebar">
+  <button class="sidebar-close" onclick="closeSidebar()" aria-label="Close menu">&times;</button>
   <div class="sidebar-logo">
     <svg viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="8" fill="#3B82F6"/><path d="M8 14l4 4 8-8" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
     <span>SMS Edge</span>
@@ -74,10 +76,14 @@
 
   <!-- TOP BAR -->
   <div class="topbar">
-    <div class="topbar-left">
+    <div class="topbar-left" style="display:flex;align-items:center;gap:12px">
+      <button class="mobile-menu-btn" onclick="openSidebar()" aria-label="Open menu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <div>
       <h1>Campaign Dashboard</h1>
       <p>168 campaigns · Apr 2025 – Mar 2026 · Source: SMS Edge</p>
-    </div>
+    </div></div>
     <div class="topbar-right" style="flex-wrap:wrap">
       <div style="display:flex;align-items:center;gap:4px;background:#F8FAFC;border:1.5px solid #E2E8F0;border-radius:8px;padding:4px 10px">
         <label style="font-size:11px;color:#64748B;font-weight:600;white-space:nowrap">From</label>

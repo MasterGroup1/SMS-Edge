@@ -587,6 +587,22 @@ function renderComboTable() {
 }
 function goComboPage(p) { comboPage=p; renderComboTable(); }
 
+// ── MOBILE SIDEBAR ──────────────────────
+function openSidebar(){
+  document.getElementById('sidebar').classList.add('open');
+  document.getElementById('sidebarOverlay').classList.add('show');
+  document.body.style.overflow='hidden';
+}
+function closeSidebar(){
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebarOverlay').classList.remove('show');
+  document.body.style.overflow='';
+}
+// close sidebar when a nav item is tapped on mobile
+document.querySelectorAll('.nav-item').forEach(function(el){
+  el.addEventListener('click', function(){ if(window.innerWidth<=900) closeSidebar(); });
+});
+
 // INIT
 renderCampTable();
 renderListTable();
