@@ -1932,10 +1932,13 @@ function recomputeAggregates() {
     // List grouping (Fresh only)
     if (c.type === 'Fresh' && c.rawList) {
       if (!listGroups[c.rawList]) {
-        listGroups[c.rawList] = {list: c.rawList, camps: 0, sent: 0, clicks: 0, leads: 0, sales: 0, cost: 0};
+        listGroups[c.rawList] = {list: c.rawList, camps: 0, sent: 0, clicks: 0, leads: 0, sales: 0, cost: 0, _countries: new Set(), _dates: [], _laps: 0};
       }
       const lg = listGroups[c.rawList];
       lg.camps += 1; lg.sent += c.sent; lg.clicks += c.clicks; lg.leads += c.leads; lg.sales += c.sales; lg.cost += c.cost;
+      if (c.country) lg._countries.add(c.country);
+      if (c.date) lg._dates.push(c.date);
+      lg._laps += (c.laps || 0);
     }
 
     // Combo grouping (Fresh only)
@@ -1960,6 +1963,14 @@ function recomputeAggregates() {
     group.lead_to_sale = group.leads > 0 ? group.sales / group.leads : 0;
     group.cost_per_click = group.clicks > 0 ? group.cost / group.clicks : 0;
     group.cost_per_camp = group.camps > 0 ? group.cost / group.camps : 0;
+    group.cost_per_lead = group.leads > 0 ? group.cost / group.leads : 0;
+    // List-specific fields
+    if (group._countries) {
+      group.countries = [...group._countries].sort().join(', ');
+      group.laps = group._laps;
+      group.last_used = group._dates.length ? group._dates.sort().pop() : '—';
+      group.reuse = group.sales > 0 ? 'Yes' : group.leads > 2 ? 'Maybe' : 'No';
+    }
     return group;
   };
 
@@ -2095,9 +2106,9 @@ function renderComboTable() {
     <td class="num" title="Clicks from messages">${fmtN(c.clicks)}</td>
     <td class="num" title="clicks / sent = ${c.clicks} / ${c.sent}">${(c.ctr*100).toFixed(2)}%</td>
     <td class="num" title="Click-to-Lead conversions">${fmtN(c.leads)}</td>
-    <td class="num" title="leads / clicks = ${c.leads} / ${c.clicks}">${(c.cl2l*100).toFixed(1)}%</td>
+    <td class="num" title="leads / clicks = ${c.leads} / ${c.clicks}">${(c.click_to_lead*100).toFixed(1)}%</td>
     <td class="num" title="Lead-to-Sale conversions">${fmtN(c.sales)}</td>
-    <td class="num" title="sales / leads = ${c.sales} / ${c.leads}">${(c.l2s*100).toFixed(1)}%</td>
+    <td class="num" title="sales / leads = ${c.sales} / ${c.leads}">${(c.lead_to_sale*100).toFixed(1)}%</td>
     <td class="num" title="Total campaign cost">${fmtC(c.cost)}</td>
     <td class="num" title="cost / sales = €${c.cost.toFixed(2)} / ${c.sales}">${fmtC2(c.cpa)}</td>
     <td class="num" style="color:${c.roi >= 0 ? '#16A34A' : '#DC2626'}" title="ROI = (revenue - cost) / cost = (€${(c.sales*20).toFixed(0)} - €${c.cost.toFixed(0)}) / €${c.cost.toFixed(0)} = ${(c.roi*100).toFixed(1)}%">${(c.roi*100).toFixed(1)}%</td>
@@ -2452,7 +2463,7 @@ function initCharts() {
   updateCostBreakdown();
 }
 
-function initListCharts() {
+function renderListCharts() {
   initListCL2LChart();
   initListCPLChart();
   initListLeadsChart();
@@ -2659,7 +2670,7 @@ function initListCL2LChart() {
   if (chartInstances['listCL2L']) chartInstances['listCL2L'].destroy();
   const sorted = filteredLists.sort((a,b) => b.click_to_lead - a.click_to_lead).slice(0, 10);
   chartInstances['listCL2L'] = new Chart(ctx, {
-    type: 'barH',
+    type: 'bar',
     data: {
       labels: sorted.map(l => l.list),
       datasets: [{label: 'Cl→Lead %', data: sorted.map(l => (l.click_to_lead*100).toFixed(1)), backgroundColor: '#10B981'}]
@@ -2679,7 +2690,7 @@ function initListCPLChart() {
   if (chartInstances['listCPL']) chartInstances['listCPL'].destroy();
   const sorted = filteredLists.filter(l => l.cost_per_lead > 0).sort((a,b) => a.cost_per_lead - b.cost_per_lead).slice(0, 10);
   chartInstances['listCPL'] = new Chart(ctx, {
-    type: 'barH',
+    type: 'bar',
     data: {
       labels: sorted.map(l => l.list),
       datasets: [{label: 'Cost/Lead €', data: sorted.map(l => l.cost_per_lead.toFixed(2)), backgroundColor: '#F59E0B'}]
