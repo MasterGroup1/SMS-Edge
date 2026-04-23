@@ -747,8 +747,8 @@ tbody tr:hover{background:#F8FAFC}
           <th onclick="sortTable('listsTable', 8)" class="num" title="FTDs (first-time deposits)">Sales</th>
           <th onclick="sortTable('listsTable', 9)" class="num" title="Lead-to-Sale Rate = Sales ÷ Leads × 100">L→Sale</th>
           <th onclick="sortTable('listsTable', 10)" class="num" title="Total SMS sending cost">Cost</th>
-          <th onclick="sortTable('listsTable', 11)" class="num" title="Cost per Acquisition (Sale) = Cost ÷ Sales">CPA</th>
-          <th onclick="sortTable('listsTable', 12)" class="num" title="Effective CPA per Lead = Cost ÷ Leads">eCPA</th>
+          <th onclick="sortTable('listsTable', 11)" class="num" title="ECPA (FTD) = Total Spend ÷ Total Sales — matches main dashboard">ECPA (FTD)</th>
+          <th onclick="sortTable('listsTable', 12)" class="num" title="ECPA (Reg) = Total Spend ÷ Total Leads — matches main dashboard">ECPA (Reg)</th>
           <th onclick="sortTable('listsTable', 13)" title="Date of most recent campaign using this list">Last Used</th>
           <th onclick="sortTable('listsTable', 14)" class="num" title="Maximum number of send cycles (laps)">Laps</th>
           <th onclick="sortTable('listsTable', 15)" title="Recommendation based on ROI, CTR, lead quality, and conversion scores">Use Again?</th>
@@ -783,8 +783,9 @@ tbody tr:hover{background:#F8FAFC}
           <th onclick="sortTable('comboTable', 9)" class="num" title="FTDs (first-time deposits)">Sales</th>
           <th onclick="sortTable('comboTable', 10)" class="num" title="Lead-to-Sale Rate = Sales ÷ Leads × 100">L→Sale</th>
           <th onclick="sortTable('comboTable', 11)" class="num" title="Total SMS sending cost">Cost</th>
-          <th onclick="sortTable('comboTable', 12)" class="num" title="Cost per Acquisition (Sale) = Cost ÷ Sales">CPA</th>
-          <th onclick="sortTable('comboTable', 13)" class="num" title="Return on Investment = (Revenue - Spend) ÷ Spend × 100">ROI</th>
+          <th onclick="sortTable('comboTable', 12)" class="num" title="ECPA (FTD) = Total Spend ÷ Total Sales — same as main dashboard">ECPA (FTD)</th>
+          <th onclick="sortTable('comboTable', 13)" class="num" title="ECPA (Reg) = Total Spend ÷ Total Leads — same as main dashboard">ECPA (Reg)</th>
+          <th onclick="sortTable('comboTable', 14)" class="num" title="Return on Investment = (Revenue - Spend) ÷ Spend × 100">ROI</th>
         </tr></thead>
         <tbody id="comboTable-body"></tbody>
       </table>
@@ -2073,47 +2074,56 @@ function renderBrandsTable() {
 
 function renderListsTable() {
   const tbody = document.getElementById('listsTable-body');
-  tbody.innerHTML = filteredLists.map((l, i) => `<tr>
-    <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${l.list}">${l.list}</td>
-    <td style="font-size:11px;color:#64748B">${l.countries}</td>
-    <td class="num">${fmtN(l.camps)}</td>
-    <td class="num" title="Sent messages">${fmtN(l.sent)}</td>
-    <td class="num" title="Clicks from messages">${fmtN(l.clicks)}</td>
-    <td class="num" title="clicks / sent = ${l.clicks} / ${l.sent}">${(l.ctr*100).toFixed(2)}%</td>
-    <td class="num" title="Click-to-Lead conversions">${fmtN(l.leads)}</td>
-    <td class="num" title="leads / clicks = ${l.leads} / ${l.clicks}">${(l.click_to_lead*100).toFixed(1)}%</td>
-    <td class="num" title="Lead-to-Sale conversions">${fmtN(l.sales)}</td>
-    <td class="num" title="sales / leads = ${l.sales} / ${l.leads}">${(l.lead_to_sale*100).toFixed(1)}%</td>
-    <td class="num" title="Total campaign cost">${fmtC(l.cost)}</td>
-    <td class="num" style="color:${l.cpa < 15 ? '#16A34A' : l.cpa < 30 ? '#F59E0B' : '#DC2626'};font-weight:600" title="cost / sales = €${l.cost.toFixed(2)} / ${l.sales}">${fmtC2(l.cpa)}</td>
-    <td class="num" style="color:${l.ecpa < 15 ? '#16A34A' : l.ecpa < 30 ? '#F59E0B' : '#DC2626'};font-weight:600" title="cost / leads = €${l.cost.toFixed(2)} / ${l.leads}">${fmtC2(l.ecpa)}</td>
-    <td style="font-size:11px">${l.last_used || '—'}</td>
-    <td class="num">${l.laps}</td>
-    <td style="font-weight:600;color:${l.reuse === 'Yes' ? '#16A34A' : l.reuse === 'Maybe' ? '#F59E0B' : '#DC2626'}">${l.reuse}</td>
-  </tr>`).join('');
-  initColToggle('listsTable', ['List', 'Countries', 'Campaigns', 'Sent', 'Clicks', 'CTR', 'Leads', 'Cl→Lead', 'Sales', 'L→Sale', 'Cost', 'CPA', 'eCPA', 'Last Used', 'Laps', 'Use Again?']);
+  tbody.innerHTML = filteredLists.map((l) => {
+    const ecpa_ftd = l.sales > 0 ? l.cost / l.sales : 0;
+    const ecpa_reg = l.leads > 0 ? l.cost / l.leads : 0;
+    const revenue = l.sales * 20;
+    return `<tr>
+    <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${l.list} — used in ${l.camps} campaigns across: ${l.countries}">${l.list}</td>
+    <td style="font-size:11px;color:#64748B" title="Countries this list has been sent to: ${l.countries}">${l.countries}</td>
+    <td class="num" title="Number of campaigns using this list">${fmtN(l.camps)}</td>
+    <td class="num" title="Total SMS messages sent from this list across all campaigns">${fmtN(l.sent)}</td>
+    <td class="num" title="Total link clicks from this list">${fmtN(l.clicks)}</td>
+    <td class="num" title="CTR = Clicks ÷ Sent = ${fmtN(l.clicks)} ÷ ${fmtN(l.sent)} = ${(l.ctr*100).toFixed(2)}%">${(l.ctr*100).toFixed(2)}%</td>
+    <td class="num" title="Total registrations (leads) from this list">${fmtN(l.leads)}</td>
+    <td class="num" title="Click-to-Lead = Leads ÷ Clicks = ${l.leads} ÷ ${l.clicks} = ${(l.click_to_lead*100).toFixed(1)}%">${(l.click_to_lead*100).toFixed(1)}%</td>
+    <td class="num" title="Total FTDs (sales) from this list">${fmtN(l.sales)}</td>
+    <td class="num" title="Lead-to-Sale = Sales ÷ Leads = ${l.sales} ÷ ${l.leads} = ${(l.lead_to_sale*100).toFixed(1)}%">${(l.lead_to_sale*100).toFixed(1)}%</td>
+    <td class="num" title="Total spend across all campaigns using this list">${fmtC(l.cost)}</td>
+    <td class="num" style="color:${ecpa_ftd===0?'#94A3B8':ecpa_ftd<100?'#16A34A':ecpa_ftd<215?'#F59E0B':'#DC2626'};font-weight:600" title="ECPA (FTD) = Total Spend ÷ Total Sales = €${l.cost.toFixed(2)} ÷ ${l.sales} = ${ecpa_ftd>0?'€'+ecpa_ftd.toFixed(2):'N/A (no sales)'}">${ecpa_ftd>0?fmtC2(ecpa_ftd):'—'}</td>
+    <td class="num" style="color:${ecpa_reg===0?'#94A3B8':ecpa_reg<20?'#16A34A':ecpa_reg<50?'#F59E0B':'#DC2626'};font-weight:600" title="ECPA (Reg) = Total Spend ÷ Total Leads = €${l.cost.toFixed(2)} ÷ ${l.leads} = ${ecpa_reg>0?'€'+ecpa_reg.toFixed(2):'N/A (no leads)'}">${ecpa_reg>0?fmtC2(ecpa_reg):'—'}</td>
+    <td style="font-size:11px" title="Most recent campaign date for this list">${l.last_used || '—'}</td>
+    <td class="num" title="Total laps (SMS sending passes) across all campaigns">${l.laps}</td>
+    <td style="font-weight:600;color:${l.reuse==='Yes'?'#16A34A':l.reuse==='Maybe'?'#F59E0B':'#DC2626'}" title="${l.reuse==='Yes'?'Has generated sales — prioritise for re-use':l.reuse==='Maybe'?'Has leads but no sales yet — worth testing again':'No leads or sales — low priority for re-use'}">${l.reuse}</td>
+  </tr>`;}).join('');
+  initColToggle('listsTable', ['List', 'Countries', 'Campaigns', 'Sent', 'Clicks', 'CTR', 'Leads', 'Cl→Lead', 'Sales', 'L→Sale', 'Cost', 'ECPA (FTD)', 'ECPA (Reg)', 'Last Used', 'Laps', 'Use Again?']);
   attachColumnFilters('listsTable');
 }
 
 function renderComboTable() {
   const tbody = document.getElementById('comboTable-body');
-  tbody.innerHTML = filteredCombos.map((c, i) => `<tr>
+  tbody.innerHTML = filteredCombos.map((c) => {
+    const ecpa_ftd = c.sales > 0 ? c.cost / c.sales : 0;
+    const ecpa_reg = c.leads > 0 ? c.cost / c.leads : 0;
+    const revenue = c.sales * 20;
+    return `<tr>
     <td>${c.list}</td>
     <td>${c.brand}</td>
     <td>${c.country}</td>
-    <td class="num">${fmtN(c.sends)}</td>
-    <td class="num" title="Sent messages">${fmtN(c.sent)}</td>
-    <td class="num" title="Clicks from messages">${fmtN(c.clicks)}</td>
-    <td class="num" title="clicks / sent = ${c.clicks} / ${c.sent}">${(c.ctr*100).toFixed(2)}%</td>
-    <td class="num" title="Click-to-Lead conversions">${fmtN(c.leads)}</td>
-    <td class="num" title="leads / clicks = ${c.leads} / ${c.clicks}">${(c.click_to_lead*100).toFixed(1)}%</td>
-    <td class="num" title="Lead-to-Sale conversions">${fmtN(c.sales)}</td>
-    <td class="num" title="sales / leads = ${c.sales} / ${c.leads}">${(c.lead_to_sale*100).toFixed(1)}%</td>
-    <td class="num" title="Total campaign cost">${fmtC(c.cost)}</td>
-    <td class="num" title="cost / sales = €${c.cost.toFixed(2)} / ${c.sales}">${fmtC2(c.cpa)}</td>
-    <td class="num" style="color:${c.roi >= 0 ? '#16A34A' : '#DC2626'}" title="ROI = (revenue - cost) / cost = (€${(c.sales*20).toFixed(0)} - €${c.cost.toFixed(0)}) / €${c.cost.toFixed(0)} = ${(c.roi*100).toFixed(1)}%">${(c.roi*100).toFixed(1)}%</td>
-  </tr>`).join('');
-  initColToggle('comboTable', ['List', 'Brand', 'Country', 'Sends', 'Sent', 'Clicks', 'CTR', 'Leads', 'Cl→Lead', 'Sales', 'L→Sale', 'Cost', 'CPA', 'ROI']);
+    <td class="num" title="Number of separate sends for this List × Brand × Country combination">${fmtN(c.sends)}</td>
+    <td class="num" title="Total SMS messages sent = sum across all ${c.sends} send(s)">${fmtN(c.sent)}</td>
+    <td class="num" title="Total link clicks across all sends">${fmtN(c.clicks)}</td>
+    <td class="num" title="CTR = Clicks ÷ Sent = ${fmtN(c.clicks)} ÷ ${fmtN(c.sent)} = ${(c.ctr*100).toFixed(2)}%">${(c.ctr*100).toFixed(2)}%</td>
+    <td class="num" title="Total registrations (leads)">${fmtN(c.leads)}</td>
+    <td class="num" title="Click-to-Lead = Leads ÷ Clicks = ${c.leads} ÷ ${c.clicks} = ${(c.click_to_lead*100).toFixed(1)}%">${(c.click_to_lead*100).toFixed(1)}%</td>
+    <td class="num" title="Total FTDs (first-time deposits / sales)">${fmtN(c.sales)}</td>
+    <td class="num" title="Lead-to-Sale = Sales ÷ Leads = ${c.sales} ÷ ${c.leads} = ${(c.lead_to_sale*100).toFixed(1)}%">${(c.lead_to_sale*100).toFixed(1)}%</td>
+    <td class="num" title="Total spend across all sends for this combo">${fmtC(c.cost)}</td>
+    <td class="num" style="color:${ecpa_ftd===0?'#94A3B8':ecpa_ftd<100?'#16A34A':ecpa_ftd<215?'#F59E0B':'#DC2626'};font-weight:600" title="ECPA (FTD) = Total Spend ÷ Total Sales = €${c.cost.toFixed(2)} ÷ ${c.sales} = ${ecpa_ftd>0?'€'+ecpa_ftd.toFixed(2):'N/A (no sales)'}">${ecpa_ftd>0?fmtC2(ecpa_ftd):'—'}</td>
+    <td class="num" style="color:${ecpa_reg===0?'#94A3B8':ecpa_reg<20?'#16A34A':ecpa_reg<50?'#F59E0B':'#DC2626'};font-weight:600" title="ECPA (Reg) = Total Spend ÷ Total Leads = €${c.cost.toFixed(2)} ÷ ${c.leads} = ${ecpa_reg>0?'€'+ecpa_reg.toFixed(2):'N/A (no leads)'}">${ecpa_reg>0?fmtC2(ecpa_reg):'—'}</td>
+    <td class="num" style="color:${c.roi>=0?'#16A34A':'#DC2626'};font-weight:600" title="ROI = (Revenue − Spend) ÷ Spend = (€${revenue.toFixed(0)} − €${c.cost.toFixed(2)}) ÷ €${c.cost.toFixed(2)} = ${(c.roi*100).toFixed(1)}% | Revenue = ${c.sales} sales × €20">${(c.roi*100).toFixed(1)}%</td>
+  </tr>`;}).join('');
+  initColToggle('comboTable', ['List', 'Brand', 'Country', 'Sends', 'Sent', 'Clicks', 'CTR', 'Leads', 'Cl→Lead', 'Sales', 'L→Sale', 'Cost', 'ECPA (FTD)', 'ECPA (Reg)', 'ROI']);
   attachColumnFilters('comboTable');
 }
 
