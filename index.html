@@ -2119,8 +2119,13 @@ function renderListsTable() {
     const ecpa_reg = l.leads > 0 ? l.cost / l.leads : 0;
     const lid = 'list-' + idx;
 
+    // Look up campaigns directly from filteredCampaigns for reliability
+    const listCampaigns = filteredCampaigns
+      .filter(c => c.rawList === l.list)
+      .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
     // Build campaign sub-rows
-    const campRows = (l.campaigns || []).map(c => {
+    const campRows = listCampaigns.map(c => {
       const c_ecpa_ftd = c.sales > 0 ? c.cost / c.sales : 0;
       const c_ecpa_reg = c.leads > 0 ? c.cost / c.leads : 0;
       const c_ctr = c.sent > 0 ? c.clicks / c.sent : 0;
@@ -2151,7 +2156,7 @@ function renderListsTable() {
     const summaryRow = `<tr class="list-summary-row" data-lid="${lid}">
       <td style="white-space:nowrap">
         <div style="display:flex;align-items:center;gap:6px">
-          <button class="list-expand-btn" id="btn-${lid}" onclick="toggleListDetail('${lid}')" title="Show all ${l.camps} campaigns">▶</button>
+          <button class="list-expand-btn" id="btn-${lid}" onclick="toggleListDetail('${lid}')" title="Show all ${listCampaigns.length} campaigns">▶</button>
           <span style="overflow:hidden;text-overflow:ellipsis;max-width:175px;display:inline-block" title="${l.list} — ${l.camps} campaigns across: ${l.countries}">${l.list}</span>
         </div>
       </td>
@@ -2176,7 +2181,7 @@ function renderListsTable() {
       <td colspan="${COLS}" style="padding:0">
         <div class="list-detail-inner">
           <div style="font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">
-            ${l.camps} campaign${l.camps!==1?'s':''} using <span style="color:#3B82F6">${l.list}</span>
+            ${listCampaigns.length} campaign${listCampaigns.length!==1?'s':''} using <span style="color:#3B82F6">${l.list}</span>
           </div>
           <div style="overflow-x:auto">
           <table>
