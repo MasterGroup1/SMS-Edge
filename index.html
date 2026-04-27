@@ -2747,16 +2747,16 @@ function initTopListsChart() {
         {
           label: 'Leads (Registrations)',
           data: items.map(i => i.leads),
-          backgroundColor: '#3B82F6',
-          borderColor: '#2563EB',
+          backgroundColor: items.map(i => getColor(i) + '88'),
+          borderColor: items.map(i => getColor(i)),
           borderWidth: 1,
           borderRadius: 4,
         },
         {
           label: 'Sales (FTDs)',
           data: items.map(i => i.sales),
-          backgroundColor: '#10B981',
-          borderColor: '#059669',
+          backgroundColor: items.map(i => getColor(i)),
+          borderColor: items.map(i => getColor(i)),
           borderWidth: 1,
           borderRadius: 4,
         }
@@ -2786,6 +2786,7 @@ function initTopListsChart() {
         tooltip: {
           callbacks: {
             title: (ctx) => items[ctx[0].dataIndex].list,
+            label: () => null,
             afterBody: (ctx) => {
               const item = items[ctx[0].dataIndex];
               const ctr = item.sent > 0 ? (item.clicks/item.sent*100).toFixed(2) : '0.00';
