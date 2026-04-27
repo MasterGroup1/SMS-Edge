@@ -284,6 +284,42 @@ tbody tr:hover{background:#F8FAFC}
 }
 .takeaway{margin:8px 0;padding:8px;background:#F1F5F9;border-left:3px solid #3B82F6;color:#334155;border-radius:2px;font-size:10px;line-height:1.4}
 
+/* ── LIST EXPAND ROWS ──────────────────── */
+.list-expand-btn{
+  background:none;border:none;cursor:pointer;padding:2px 6px;
+  font-size:13px;color:#94A3B8;transition:transform .2s,color .15s;
+  line-height:1;border-radius:4px;flex-shrink:0;
+}
+.list-expand-btn:hover{color:#3B82F6;background:#EFF6FF}
+.list-expand-btn.open{transform:rotate(90deg);color:#3B82F6}
+.list-detail-row{display:none;background:#F8FAFC}
+.list-detail-row.open{display:table-row}
+.list-detail-inner{
+  padding:12px 16px 16px 32px;
+  border-bottom:2px solid #E2E8F0;
+}
+.list-detail-inner table{
+  width:100%;font-size:11px;border-collapse:collapse;
+  min-width:900px;background:#fff;border-radius:8px;
+  border:1px solid #E2E8F0;overflow:hidden;
+}
+.list-detail-inner thead th{
+  background:#1E293B;color:#94A3B8;padding:7px 10px;
+  font-size:10px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.5px;text-align:left;white-space:nowrap;
+}
+.list-detail-inner thead th.num{text-align:right}
+.list-detail-inner tbody td{
+  padding:6px 10px;border-bottom:1px solid #F1F5F9;
+  color:#334155;white-space:nowrap;
+}
+.list-detail-inner tbody td.num{text-align:right;font-variant-numeric:tabular-nums}
+.list-detail-inner tbody tr:last-child td{border-bottom:none}
+.list-detail-inner tbody tr:hover{background:#F1F5F9}
+.list-detail-inner .detail-total td{
+  background:#F8FAFC;font-weight:700;color:#0F172A;
+  border-top:2px solid #E2E8F0;
+}
 </style>
 </head>
 <body>
@@ -1933,13 +1969,14 @@ function recomputeAggregates() {
     // List grouping (Fresh only)
     if (c.type === 'Fresh' && c.rawList) {
       if (!listGroups[c.rawList]) {
-        listGroups[c.rawList] = {list: c.rawList, camps: 0, sent: 0, clicks: 0, leads: 0, sales: 0, cost: 0, _countries: new Set(), _dates: [], _laps: 0};
+        listGroups[c.rawList] = {list: c.rawList, camps: 0, sent: 0, clicks: 0, leads: 0, sales: 0, cost: 0, _countries: new Set(), _dates: [], _laps: 0, _campaigns: []};
       }
       const lg = listGroups[c.rawList];
       lg.camps += 1; lg.sent += c.sent; lg.clicks += c.clicks; lg.leads += c.leads; lg.sales += c.sales; lg.cost += c.cost;
       if (c.country) lg._countries.add(c.country);
       if (c.date) lg._dates.push(c.date);
       lg._laps += (c.laps || 0);
+      lg._campaigns.push(c);
     }
 
     // Combo grouping (Fresh only)
@@ -1969,8 +2006,9 @@ function recomputeAggregates() {
     if (group._countries) {
       group.countries = [...group._countries].sort().join(', ');
       group.laps = group._laps;
-      group.last_used = group._dates.length ? group._dates.sort().pop() : '—';
+      group.last_used = group._dates.length ? [...group._dates].sort().pop() : '—';
       group.reuse = group.sales > 0 ? 'Yes' : group.leads > 2 ? 'Maybe' : 'No';
+      group.campaigns = (group._campaigns || []).slice().sort((a,b) => (b.date||'').localeCompare(a.date||''));
     }
     return group;
   };
@@ -2074,30 +2112,102 @@ function renderBrandsTable() {
 
 function renderListsTable() {
   const tbody = document.getElementById('listsTable-body');
-  tbody.innerHTML = filteredLists.map((l) => {
+  const COLS = 16; // total columns in table
+
+  tbody.innerHTML = filteredLists.map((l, idx) => {
     const ecpa_ftd = l.sales > 0 ? l.cost / l.sales : 0;
     const ecpa_reg = l.leads > 0 ? l.cost / l.leads : 0;
-    const revenue = l.sales * 20;
-    return `<tr>
-    <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${l.list} — used in ${l.camps} campaigns across: ${l.countries}">${l.list}</td>
-    <td style="font-size:11px;color:#64748B" title="Countries this list has been sent to: ${l.countries}">${l.countries}</td>
-    <td class="num" title="Number of campaigns using this list">${fmtN(l.camps)}</td>
-    <td class="num" title="Total SMS messages sent from this list across all campaigns">${fmtN(l.sent)}</td>
-    <td class="num" title="Total link clicks from this list">${fmtN(l.clicks)}</td>
-    <td class="num" title="CTR = Clicks ÷ Sent = ${fmtN(l.clicks)} ÷ ${fmtN(l.sent)} = ${(l.ctr*100).toFixed(2)}%">${(l.ctr*100).toFixed(2)}%</td>
-    <td class="num" title="Total registrations (leads) from this list">${fmtN(l.leads)}</td>
-    <td class="num" title="Click-to-Lead = Leads ÷ Clicks = ${l.leads} ÷ ${l.clicks} = ${(l.click_to_lead*100).toFixed(1)}%">${(l.click_to_lead*100).toFixed(1)}%</td>
-    <td class="num" title="Total FTDs (sales) from this list">${fmtN(l.sales)}</td>
-    <td class="num" title="Lead-to-Sale = Sales ÷ Leads = ${l.sales} ÷ ${l.leads} = ${(l.lead_to_sale*100).toFixed(1)}%">${(l.lead_to_sale*100).toFixed(1)}%</td>
-    <td class="num" title="Total spend across all campaigns using this list">${fmtC(l.cost)}</td>
-    <td class="num" style="color:${ecpa_ftd===0?'#94A3B8':ecpa_ftd<100?'#16A34A':ecpa_ftd<215?'#F59E0B':'#DC2626'};font-weight:600" title="ECPA (FTD) = Total Spend ÷ Total Sales = €${l.cost.toFixed(2)} ÷ ${l.sales} = ${ecpa_ftd>0?'€'+ecpa_ftd.toFixed(2):'N/A (no sales)'}">${ecpa_ftd>0?fmtC2(ecpa_ftd):'—'}</td>
-    <td class="num" style="color:${ecpa_reg===0?'#94A3B8':ecpa_reg<20?'#16A34A':ecpa_reg<50?'#F59E0B':'#DC2626'};font-weight:600" title="ECPA (Reg) = Total Spend ÷ Total Leads = €${l.cost.toFixed(2)} ÷ ${l.leads} = ${ecpa_reg>0?'€'+ecpa_reg.toFixed(2):'N/A (no leads)'}">${ecpa_reg>0?fmtC2(ecpa_reg):'—'}</td>
-    <td style="font-size:11px" title="Most recent campaign date for this list">${l.last_used || '—'}</td>
-    <td class="num" title="Total laps (SMS sending passes) across all campaigns">${l.laps}</td>
-    <td style="font-weight:600;color:${l.reuse==='Yes'?'#16A34A':l.reuse==='Maybe'?'#F59E0B':'#DC2626'}" title="${l.reuse==='Yes'?'Has generated sales — prioritise for re-use':l.reuse==='Maybe'?'Has leads but no sales yet — worth testing again':'No leads or sales — low priority for re-use'}">${l.reuse}</td>
-  </tr>`;}).join('');
+    const lid = 'list-' + idx;
+
+    // Build campaign sub-rows
+    const campRows = (l.campaigns || []).map(c => {
+      const c_ecpa_ftd = c.sales > 0 ? c.cost / c.sales : 0;
+      const c_ecpa_reg = c.leads > 0 ? c.cost / c.leads : 0;
+      const c_ctr = c.sent > 0 ? c.clicks / c.sent : 0;
+      const c_cl2l = c.clicks > 0 ? c.leads / c.clicks : 0;
+      const c_l2s = c.leads > 0 ? c.sales / c.leads : 0;
+      const c_roi = c.cost > 0 ? ((c.sales * 20) - c.cost) / c.cost : 0;
+      return `<tr>
+        <td title="${c.date}">${c.date || '—'}</td>
+        <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${c.name}">${c.name}</td>
+        <td>${c.brand || '—'}</td>
+        <td>${c.country || '—'}</td>
+        <td style="color:${c.type==='Clicked'?'#7C3AED':'#0284C7'};font-weight:600">${c.type}</td>
+        <td class="num" title="SMS messages sent">${fmtN(c.sent)}</td>
+        <td class="num" title="Link clicks">${fmtN(c.clicks)}</td>
+        <td class="num" title="CTR = ${c.clicks} ÷ ${c.sent} = ${(c_ctr*100).toFixed(2)}%">${(c_ctr*100).toFixed(2)}%</td>
+        <td class="num" title="Registrations">${fmtN(c.leads)}</td>
+        <td class="num" title="Cl→Lead = ${c.leads} ÷ ${c.clicks} = ${(c_cl2l*100).toFixed(1)}%">${(c_cl2l*100).toFixed(1)}%</td>
+        <td class="num" title="FTDs (sales)">${fmtN(c.sales)}</td>
+        <td class="num" title="L→Sale = ${c.sales} ÷ ${c.leads} = ${(c_l2s*100).toFixed(1)}%">${(c_l2s*100).toFixed(1)}%</td>
+        <td class="num" title="SMS send cost">${fmtC(c.cost)}</td>
+        <td class="num" style="color:${c_ecpa_ftd===0?'#94A3B8':c_ecpa_ftd<100?'#16A34A':c_ecpa_ftd<215?'#F59E0B':'#DC2626'};font-weight:600" title="ECPA (FTD) = €${c.cost.toFixed(2)} ÷ ${c.sales} = ${c_ecpa_ftd>0?'€'+c_ecpa_ftd.toFixed(2):'no sales'}">${c_ecpa_ftd>0?fmtC2(c_ecpa_ftd):'—'}</td>
+        <td class="num" style="color:${c_ecpa_reg===0?'#94A3B8':c_ecpa_reg<20?'#16A34A':c_ecpa_reg<50?'#F59E0B':'#DC2626'};font-weight:600" title="ECPA (Reg) = €${c.cost.toFixed(2)} ÷ ${c.leads} = ${c_ecpa_reg>0?'€'+c_ecpa_reg.toFixed(2):'no leads'}">${c_ecpa_reg>0?fmtC2(c_ecpa_reg):'—'}</td>
+        <td class="num" style="color:${c_roi>=0?'#16A34A':'#DC2626'};font-weight:600" title="ROI = (€${(c.sales*20).toFixed(0)} − €${c.cost.toFixed(2)}) ÷ €${c.cost.toFixed(2)} = ${(c_roi*100).toFixed(1)}%">${(c_roi*100).toFixed(1)}%</td>
+        <td class="num" title="Send laps for this campaign">${c.laps || 0}</td>
+      </tr>`;
+    }).join('');
+
+    const summaryRow = `<tr class="list-summary-row" data-lid="${lid}">
+      <td style="white-space:nowrap">
+        <div style="display:flex;align-items:center;gap:6px">
+          <button class="list-expand-btn" id="btn-${lid}" onclick="toggleListDetail('${lid}')" title="Show all ${l.camps} campaigns">▶</button>
+          <span style="overflow:hidden;text-overflow:ellipsis;max-width:175px;display:inline-block" title="${l.list} — ${l.camps} campaigns across: ${l.countries}">${l.list}</span>
+        </div>
+      </td>
+      <td style="font-size:11px;color:#64748B" title="${l.countries}">${l.countries}</td>
+      <td class="num" title="${l.camps} campaigns used this list">${fmtN(l.camps)}</td>
+      <td class="num" title="Total sent across all campaigns">${fmtN(l.sent)}</td>
+      <td class="num" title="Total clicks">${fmtN(l.clicks)}</td>
+      <td class="num" title="CTR = ${fmtN(l.clicks)} ÷ ${fmtN(l.sent)} = ${(l.ctr*100).toFixed(2)}%">${(l.ctr*100).toFixed(2)}%</td>
+      <td class="num" title="Total leads">${fmtN(l.leads)}</td>
+      <td class="num" title="Cl→Lead = ${l.leads} ÷ ${l.clicks} = ${(l.click_to_lead*100).toFixed(1)}%">${(l.click_to_lead*100).toFixed(1)}%</td>
+      <td class="num" title="Total sales">${fmtN(l.sales)}</td>
+      <td class="num" title="L→Sale = ${l.sales} ÷ ${l.leads} = ${(l.lead_to_sale*100).toFixed(1)}%">${(l.lead_to_sale*100).toFixed(1)}%</td>
+      <td class="num" title="Total cost">${fmtC(l.cost)}</td>
+      <td class="num" style="color:${ecpa_ftd===0?'#94A3B8':ecpa_ftd<100?'#16A34A':ecpa_ftd<215?'#F59E0B':'#DC2626'};font-weight:600" title="ECPA (FTD) = €${l.cost.toFixed(2)} ÷ ${l.sales} = ${ecpa_ftd>0?'€'+ecpa_ftd.toFixed(2):'no sales'}">${ecpa_ftd>0?fmtC2(ecpa_ftd):'—'}</td>
+      <td class="num" style="color:${ecpa_reg===0?'#94A3B8':ecpa_reg<20?'#16A34A':ecpa_reg<50?'#F59E0B':'#DC2626'};font-weight:600" title="ECPA (Reg) = €${l.cost.toFixed(2)} ÷ ${l.leads} = ${ecpa_reg>0?'€'+ecpa_reg.toFixed(2):'no leads'}">${ecpa_reg>0?fmtC2(ecpa_reg):'—'}</td>
+      <td style="font-size:11px">${l.last_used || '—'}</td>
+      <td class="num">${l.laps}</td>
+      <td style="font-weight:600;color:${l.reuse==='Yes'?'#16A34A':l.reuse==='Maybe'?'#F59E0B':'#DC2626'}">${l.reuse}</td>
+    </tr>`;
+
+    const detailRow = `<tr class="list-detail-row" id="${lid}">
+      <td colspan="${COLS}" style="padding:0">
+        <div class="list-detail-inner">
+          <div style="font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">
+            ${l.camps} campaign${l.camps!==1?'s':''} using <span style="color:#3B82F6">${l.list}</span>
+          </div>
+          <div style="overflow-x:auto">
+          <table>
+            <thead><tr>
+              <th>Date</th><th>Campaign Name</th><th>Brand</th><th>Country</th><th>Type</th>
+              <th class="num">Sent</th><th class="num">Clicks</th><th class="num">CTR</th>
+              <th class="num">Leads</th><th class="num">Cl→Lead</th>
+              <th class="num">Sales</th><th class="num">L→Sale</th>
+              <th class="num">Cost</th><th class="num">ECPA (FTD)</th><th class="num">ECPA (Reg)</th>
+              <th class="num">ROI</th><th class="num">Laps</th>
+            </tr></thead>
+            <tbody>${campRows}</tbody>
+          </table>
+          </div>
+        </div>
+      </td>
+    </tr>`;
+
+    return summaryRow + detailRow;
+  }).join('');
+
   initColToggle('listsTable', ['List', 'Countries', 'Campaigns', 'Sent', 'Clicks', 'CTR', 'Leads', 'Cl→Lead', 'Sales', 'L→Sale', 'Cost', 'ECPA (FTD)', 'ECPA (Reg)', 'Last Used', 'Laps', 'Use Again?']);
   attachColumnFilters('listsTable');
+}
+
+function toggleListDetail(lid) {
+  const detailRow = document.getElementById(lid);
+  const btn = document.getElementById('btn-' + lid);
+  if (!detailRow) return;
+  const isOpen = detailRow.classList.toggle('open');
+  btn.classList.toggle('open', isOpen);
 }
 
 function renderComboTable() {
