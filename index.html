@@ -480,7 +480,7 @@ tbody tr:hover{background:#F8FAFC}
           <button id="topListsByPartner" class="topbar-btn btn-ghost" onclick="setTopListsMode('partner')" style="font-size:11px;padding:6px 12px">By Partner</button>
         </div>
       </div>
-      <div class="chart-wrap">
+      <div style="position:relative;height:340px">
         <canvas id="chartTopLists"></canvas>
       </div>
       <div id="topListsLegend" style="display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:12px;padding-top:12px;border-top:1px solid #E2E8F0"></div>
@@ -2701,32 +2701,34 @@ function initTopListsChart() {
   if (!ctx) return;
   if (chartInstances['topLists']) chartInstances['topLists'].destroy();
 
-  // Group filtered Fresh campaigns by list, track country & partner
+  // Aggregate per list
   const listStats = {};
-  filteredCampaigns.filter(c => c.type === 'Fresh' && c.rawList).forEach(c => {
+  filteredCampaigns.filter(c => c.rawList).forEach(c => {
     const key = c.rawList;
     if (!listStats[key]) {
-      listStats[key] = {list: key, sales: 0, leads: 0, cost: 0, country: c.country, partner: c.partner || 'Unknown'};
+      listStats[key] = {list: key, sales: 0, leads: 0, clicks: 0, sent: 0, cost: 0, camps: 0,
+        country: c.country, partner: c.partner || 'Unknown'};
     }
-    listStats[key].sales += c.sales;
-    listStats[key].leads += c.leads;
-    listStats[key].cost += c.cost;
+    const s = listStats[key];
+    s.sales += c.sales; s.leads += c.leads; s.clicks += c.clicks;
+    s.sent += c.sent; s.cost += c.cost; s.camps += 1;
   });
 
   let items = Object.values(listStats);
 
   if (topListsMode === 'country') {
-    // Best list per country (top 15 overall by sales, colored by country)
-    items = items.sort((a,b) => b.sales - a.sales).slice(0, 15);
+    // Best list per country — pick the highest-lead list for each country
+    const byCountry = {};
+    items.forEach(i => {
+      if (!byCountry[i.country] || i.leads > byCountry[i.country].leads) byCountry[i.country] = i;
+    });
+    items = Object.values(byCountry).sort((a,b) => b.leads - a.leads).slice(0, 12);
   } else {
-    // Top lists per partner — top 15 by sales, colored by partner
-    items = items.sort((a,b) => b.sales - a.sales).slice(0, 15);
+    // Top 12 lists by leads, colored by partner
+    items = items.sort((a,b) => b.leads - a.leads).slice(0, 12);
   }
 
   const partnerPalette = ['#3B82F6','#10B981','#F59E0B','#EC4899','#8B5CF6','#EF4444','#14B8A6','#F97316','#6366F1','#84CC16'];
-  const groupKey = topListsMode === 'country' ? 'country' : 'partner';
-
-  // For country mode, use the global COUNTRY_COLORS; for partner mode, build a local map
   let getColor;
   if (topListsMode === 'country') {
     getColor = (item) => countryColor(item.country);
@@ -2737,35 +2739,81 @@ function initTopListsChart() {
     getColor = (item) => partnerColorMap[item.partner || 'Unknown'];
   }
 
+  // Shorten label: strip long date suffixes for readability
+  const shortLabel = (name) => name.replace(/_\d{8}_/g,'_').replace(/_Batch\d+_/g,'_').replace(/_Consol_\d+/,'');
+
   chartInstances['topLists'] = new Chart(ctx, {
     type: 'bar',
     data: {
-      labels: items.map(i => i.list),
-      datasets: [{
-        label: 'Sales',
-        data: items.map(i => i.sales),
-        backgroundColor: items.map(i => getColor(i)),
-      }]
+      labels: items.map(i => shortLabel(i.list)),
+      datasets: [
+        {
+          label: 'Leads (Registrations)',
+          data: items.map(i => i.leads),
+          backgroundColor: items.map(i => getColor(i) + 'CC'),
+          borderColor: items.map(i => getColor(i)),
+          borderWidth: 1,
+          borderRadius: 4,
+        },
+        {
+          label: 'Sales (FTDs)',
+          data: items.map(i => i.sales),
+          backgroundColor: items.map(i => getColor(i)),
+          borderColor: items.map(i => getColor(i)),
+          borderWidth: 0,
+          borderRadius: 4,
+        }
+      ]
     },
     options: {
       indexAxis: 'y',
       responsive: true, maintainAspectRatio: false,
       plugins: {
-        legend: {display: false},
+        legend: {
+          display: true,
+          position: 'top',
+          labels: {
+            usePointStyle: true, pointStyle: 'rect',
+            font: {size: 11}, color: '#64748B',
+            generateLabels: () => [
+              {text: 'Leads (Registrations)', fillStyle: '#94A3B8CC', strokeStyle: '#94A3B8', lineWidth: 1, pointStyle: 'rect'},
+              {text: 'Sales (FTDs)', fillStyle: '#94A3B8', strokeStyle: '#94A3B8', lineWidth: 0, pointStyle: 'rect'}
+            ]
+          }
+        },
         tooltip: {
           callbacks: {
-            afterLabel: (ctx) => {
-              const item = items[ctx.dataIndex];
+            title: (ctx) => items[ctx[0].dataIndex].list,
+            afterBody: (ctx) => {
+              const item = items[ctx[0].dataIndex];
+              const ctr = item.sent > 0 ? (item.clicks/item.sent*100).toFixed(2) : '0.00';
+              const cl2l = item.clicks > 0 ? (item.leads/item.clicks*100).toFixed(1) : '0.0';
+              const ecpa_ftd = item.sales > 0 ? '€'+(item.cost/item.sales).toFixed(2) : '—';
+              const ecpa_reg = item.leads > 0 ? '€'+(item.cost/item.leads).toFixed(2) : '—';
               return [
-                `Leads: ${item.leads}`,
-                `Cost: €${item.cost.toFixed(0)}`,
+                `────────────────────`,
+                `Campaigns: ${item.camps}`,
+                `Sent: ${item.sent.toLocaleString()}`,
+                `Clicks: ${item.clicks.toLocaleString()}  CTR: ${ctr}%`,
+                `Leads: ${item.leads}  Cl→Lead: ${cl2l}%`,
+                `Sales: ${item.sales}`,
+                `Cost: €${item.cost.toFixed(2)}`,
+                `ECPA (FTD): ${ecpa_ftd}`,
+                `ECPA (Reg): ${ecpa_reg}`,
                 topListsMode === 'country' ? `Country: ${item.country}` : `Partner: ${item.partner}`
               ];
             }
           }
         }
       },
-      scales: {x: {beginAtZero: true}}
+      scales: {
+        x: {
+          beginAtZero: true,
+          title: {display: true, text: topListsMode === 'country' ? 'Leads — Best List per Country' : 'Leads (Registrations)', color: '#94A3B8', font: {size: 11}},
+          ticks: {color: '#94A3B8', font: {size: 10}}
+        },
+        y: {ticks: {color: '#334155', font: {size: 11}}}
+      }
     }
   });
 
