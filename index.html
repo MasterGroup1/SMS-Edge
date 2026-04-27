@@ -2747,17 +2747,17 @@ function initTopListsChart() {
         {
           label: 'Leads (Registrations)',
           data: items.map(i => i.leads),
-          backgroundColor: items.map(i => getColor(i) + 'CC'),
-          borderColor: items.map(i => getColor(i)),
+          backgroundColor: '#3B82F6',
+          borderColor: '#2563EB',
           borderWidth: 1,
           borderRadius: 4,
         },
         {
           label: 'Sales (FTDs)',
           data: items.map(i => i.sales),
-          backgroundColor: items.map(i => getColor(i)),
-          borderColor: items.map(i => getColor(i)),
-          borderWidth: 0,
+          backgroundColor: '#10B981',
+          borderColor: '#059669',
+          borderWidth: 1,
           borderRadius: 4,
         }
       ]
@@ -2769,12 +2769,17 @@ function initTopListsChart() {
         legend: {
           display: true,
           position: 'top',
+          align: 'center',
           labels: {
-            usePointStyle: true, pointStyle: 'rect',
-            font: {size: 11}, color: '#64748B',
+            usePointStyle: true,
+            pointStyle: 'rect',
+            pointStyleWidth: 16,
+            font: {size: 12, weight: '600'},
+            color: '#334155',
+            padding: 20,
             generateLabels: () => [
-              {text: 'Leads (Registrations)', fillStyle: '#94A3B8CC', strokeStyle: '#94A3B8', lineWidth: 1, pointStyle: 'rect'},
-              {text: 'Sales (FTDs)', fillStyle: '#94A3B8', strokeStyle: '#94A3B8', lineWidth: 0, pointStyle: 'rect'}
+              {text: '  Leads — total registrations from this list', fillStyle: '#3B82F6', strokeStyle: '#2563EB', lineWidth: 1, pointStyle: 'rect'},
+              {text: '  Sales — total FTDs (first-time deposits)', fillStyle: '#10B981', strokeStyle: '#059669', lineWidth: 1, pointStyle: 'rect'}
             ]
           }
         },
