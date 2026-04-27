@@ -2137,7 +2137,6 @@ function renderListsTable() {
         <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${c.name}">${c.name}</td>
         <td>${c.brand || '—'}</td>
         <td>${c.country || '—'}</td>
-        <td style="color:${c.type==='Clicked'?'#7C3AED':'#0284C7'};font-weight:600">${c.type}</td>
         <td class="num" title="SMS messages sent">${fmtN(c.sent)}</td>
         <td class="num" title="Link clicks">${fmtN(c.clicks)}</td>
         <td class="num" title="CTR = ${c.clicks} ÷ ${c.sent} = ${(c_ctr*100).toFixed(2)}%">${(c_ctr*100).toFixed(2)}%</td>
@@ -2186,7 +2185,7 @@ function renderListsTable() {
           <div style="overflow-x:auto">
           <table>
             <thead><tr>
-              <th>Date</th><th>Campaign Name</th><th>Brand</th><th>Country</th><th>Type</th>
+              <th>Date</th><th>Campaign Name</th><th>Brand</th><th>Country</th>
               <th class="num">Sent</th><th class="num">Clicks</th><th class="num">CTR</th>
               <th class="num">Leads</th><th class="num">Cl→Lead</th>
               <th class="num">Sales</th><th class="num">L→Sale</th>
