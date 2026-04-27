@@ -2739,13 +2739,10 @@ function initTopListsChart() {
     getColor = (item) => partnerColorMap[item.partner || 'Unknown'];
   }
 
-  // Shorten label: strip long date suffixes for readability
-  const shortLabel = (name) => name.replace(/_\d{8}_/g,'_').replace(/_Batch\d+_/g,'_').replace(/_Consol_\d+/,'');
-
   chartInstances['topLists'] = new Chart(ctx, {
     type: 'bar',
     data: {
-      labels: items.map(i => shortLabel(i.list)),
+      labels: items.map(i => i.list),
       datasets: [
         {
           label: 'Leads (Registrations)',
