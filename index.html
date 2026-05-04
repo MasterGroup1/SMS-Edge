@@ -2176,7 +2176,7 @@ function renderListsTable() {
       <td style="font-weight:600;color:${l.reuse==='Yes'?'#16A34A':l.reuse==='Maybe'?'#F59E0B':'#DC2626'}">${l.reuse}</td>
     </tr>`;
 
-    const detailRow = `<tr class="list-detail-row" id="${lid}">
+    const detailRow = `<tr class="list-detail-row" id="${lid}" style="display:none">
       <td colspan="${COLS}" style="padding:0">
         <div class="list-detail-inner">
           <div style="font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">
@@ -2210,7 +2210,8 @@ function toggleListDetail(lid) {
   const detailRow = document.getElementById(lid);
   const btn = document.getElementById('btn-' + lid);
   if (!detailRow) return;
-  const isOpen = detailRow.classList.toggle('open');
+  const isOpen = detailRow.style.display !== 'table-row';
+  detailRow.style.display = isOpen ? 'table-row' : 'none';
   btn.classList.toggle('open', isOpen);
 }
 
@@ -2553,6 +2554,7 @@ function applyAllColFilters(tableId) {
   const rows = Array.from(table.querySelectorAll('tbody tr'));
   const filters = colFilters[tableId] || {};
   rows.forEach(row => {
+    if (row.closest('.list-detail-row')) return; // skip detail rows and their inner rows
     let visible = true;
     for (const [colIdx, selected] of Object.entries(filters)) {
       const val = (row.cells[colIdx]?.innerText || '').trim();
@@ -2923,7 +2925,7 @@ function initContentChart() {
 // ── HELPER FUNCTIONS ───────────────────────
 function sortTable(tableId, col, direction) {
   const table = document.getElementById(tableId);
-  const rows = Array.from(table.querySelectorAll('tbody tr'));
+  const tbody = table.querySelector('tbody');
   let isAsc = table.dataset.sortCol == col && table.dataset.sortAsc === 'true';
 
   // If direction is specified, use it; otherwise toggle
@@ -2933,16 +2935,37 @@ function sortTable(tableId, col, direction) {
     isAsc = table.dataset.sortCol == col && table.dataset.sortAsc === 'true';
   }
 
-  rows.sort((a, b) => {
-    const aVal = a.cells[col]?.innerText || '';
-    const bVal = b.cells[col]?.innerText || '';
-    const aNum = parseFloat(aVal.replace(/[^0-9.-]/g, ''));
-    const bNum = parseFloat(bVal.replace(/[^0-9.-]/g, ''));
-    const isNum = !isNaN(aNum) && !isNaN(bNum);
-    const cmp = isNum ? aNum - bNum : aVal.localeCompare(bVal);
-    return isAsc ? -cmp : cmp;
-  });
-  rows.forEach(r => table.querySelector('tbody').appendChild(r));
+  if (tableId === 'listsTable') {
+    // Sort only summary rows, re-append each with its paired detail row
+    const summaryRows = Array.from(tbody.querySelectorAll('tr.list-summary-row'));
+    summaryRows.sort((a, b) => {
+      const aVal = a.cells[col]?.innerText || '';
+      const bVal = b.cells[col]?.innerText || '';
+      const aNum = parseFloat(aVal.replace(/[^0-9.-]/g, ''));
+      const bNum = parseFloat(bVal.replace(/[^0-9.-]/g, ''));
+      const isNum = !isNaN(aNum) && !isNaN(bNum);
+      const cmp = isNum ? aNum - bNum : aVal.localeCompare(bVal);
+      return isAsc ? -cmp : cmp;
+    });
+    summaryRows.forEach(summaryRow => {
+      const lid = summaryRow.dataset.lid;
+      const detailRow = lid ? document.getElementById(lid) : null;
+      tbody.appendChild(summaryRow);
+      if (detailRow) tbody.appendChild(detailRow);
+    });
+  } else {
+    const rows = Array.from(tbody.querySelectorAll('tr')).filter(r => !r.closest('.list-detail-row'));
+    rows.sort((a, b) => {
+      const aVal = a.cells[col]?.innerText || '';
+      const bVal = b.cells[col]?.innerText || '';
+      const aNum = parseFloat(aVal.replace(/[^0-9.-]/g, ''));
+      const bNum = parseFloat(bVal.replace(/[^0-9.-]/g, ''));
+      const isNum = !isNaN(aNum) && !isNaN(bNum);
+      const cmp = isNum ? aNum - bNum : aVal.localeCompare(bVal);
+      return isAsc ? -cmp : cmp;
+    });
+    rows.forEach(r => tbody.appendChild(r));
+  }
 
   // Update header indicators
   table.querySelectorAll('th').forEach((th, idx) => {
@@ -2966,6 +2989,7 @@ function filterTable(tableId) {
   const filter = input.value.toUpperCase();
   const table = document.getElementById(tableId);
   Array.from(table.querySelectorAll('tbody tr')).forEach(row => {
+    if (row.closest('.list-detail-row')) return; // skip detail rows and their inner rows
     const text = row.innerText.toUpperCase();
     row.style.display = text.includes(filter) ? '' : 'none';
   });
