@@ -3081,8 +3081,39 @@ function handleFileUpload(e) {
 }
 
 // ── CSV PARSER ─────────────────────────────
+function splitCSVLines(text) {
+  // Respects newlines inside quoted fields (e.g. multi-line cells from Excel)
+  const lines = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === '"') {
+      if (inQuotes && i + 1 < text.length && text[i + 1] === '"') {
+        current += '"'; i++;
+      } else {
+        inQuotes = !inQuotes;
+        current += ch;
+      }
+    } else if (ch === '\r') {
+      if (inQuotes) current += ' '; // keep as space inside field
+    } else if (ch === '\n') {
+      if (inQuotes) {
+        current += ' '; // embedded newline inside field → space
+      } else {
+        if (current.trim()) lines.push(current);
+        current = '';
+      }
+    } else {
+      current += ch;
+    }
+  }
+  if (current.trim()) lines.push(current);
+  return lines;
+}
+
 function parseCSVData(text) {
-  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  const lines = splitCSVLines(text);
   if (lines.length < 2) return [];
 
   // Parse header row
@@ -3104,8 +3135,8 @@ function parseCSVData(text) {
 
     const get = (col) => (row[colIdx[col]] || '').trim();
     const getNum = (col) => {
-      let v = get(col).replace(/[€$£,%\s]/g, '');
-      if (v === '' || v === '-' || v === 'nan') return 0;
+      let v = get(col).replace(/[^0-9.\-]/g, '');
+      if (v === '' || v === '-' || v === '.') return 0;
       return parseFloat(v) || 0;
     };
     const getInt = (col) => Math.round(getNum(col));
@@ -3166,7 +3197,10 @@ function parseCSVData(text) {
       partner: partner || ''
     });
   }
-  return result;
+  // Deduplicate by id (keep last occurrence — consistent with Supabase upsert)
+  const seen = new Map();
+  result.forEach(c => seen.set(c.id || c.name, c));
+  return Array.from(seen.values());
 }
 
 function parseCSVRow(line) {
