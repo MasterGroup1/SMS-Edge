@@ -3157,12 +3157,13 @@ function parseCSVData(text) {
     const created = get('Created');
     const period = get('Sending Period');
 
-    // Parse date — try Created first, then Sending Period
-    let date = parseCSVDate(created);
-    if (!date && period) {
-      const periodStart = period.split(' - ')[0];
+    // Parse date — prefer Sending Period start (when campaign ran), fall back to Created
+    let date = '';
+    if (period) {
+      const periodStart = period.split(' - ')[0].trim();
       if (periodStart) date = parseCSVDate(periodStart);
     }
+    if (!date) date = parseCSVDate(created);
 
     // Determine type (Fresh vs Clicked)
     const isClicked = (!listName && name.toLowerCase().includes('click')) ||
