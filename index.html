@@ -42,23 +42,23 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:#F4F6FA;c
 
 /* ── TOP BAR ───────────────────────────── */
 .topbar{
-  background:#fff;padding:16px 32px;
-  display:flex;align-items:center;justify-content:space-between;
+  background:#fff;padding:12px 24px;
+  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;
   border-bottom:1px solid #E2E8F0;position:sticky;top:0;z-index:100;
 }
-.topbar-left h1{font-size:20px;font-weight:700;color:#0F172A}
-.topbar-left p{font-size:12px;color:#64748B;margin-top:2px}
-.topbar-right{display:flex;align-items:center;gap:12px}
+.topbar-left h1{font-size:18px;font-weight:700;color:#0F172A;line-height:1.2}
+.topbar-left p{font-size:11px;color:#64748B;margin-top:2px}
+.topbar-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .topbar-right select{
-  border:1.5px solid #E2E8F0;border-radius:8px;padding:7px 12px;
+  border:1.5px solid #E2E8F0;border-radius:8px;padding:6px 10px;
   font-size:12px;color:#334155;background:#F8FAFC;cursor:pointer;outline:none;
-  font-family:inherit;
+  font-family:inherit;max-width:140px;
 }
 .topbar-right select:hover{border-color:#3B82F6}
 .topbar-btn{
   background:#3B82F6;color:#fff;border:none;border-radius:8px;
-  padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer;
-  font-family:inherit;transition:background .15s;
+  padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;
+  font-family:inherit;transition:background .15s;white-space:nowrap;
 }
 .topbar-btn:hover{background:#2563EB}
 .btn-ghost{
@@ -68,11 +68,40 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:#F4F6FA;c
 
 /* ── DATE PICKER ────────────────────────– */
 .date-preset-btn{
-  background:transparent;border:none;text-align:left;padding:7px 10px;border-radius:6px;
-  font-size:12px;color:#334155;cursor:pointer;font-family:inherit;font-weight:500;
+  background:transparent;border:none;text-align:left;padding:6px 10px;border-radius:6px;
+  font-size:12px;color:#334155;cursor:pointer;font-family:inherit;font-weight:500;white-space:nowrap;
 }
 .date-preset-btn:hover{background:#F1F5F9;color:#0F172A}
 .date-preset-btn.active{background:#EFF6FF;color:#3B82F6;font-weight:600}
+
+/* ── RESPONSIVE BREAKPOINTS ──────────────── */
+@media (max-width:1280px){
+  .topbar{padding:10px 16px}
+  .topbar-left h1{font-size:16px}
+  .topbar-left p{display:none}
+  .topbar-right select{max-width:120px;font-size:11px;padding:5px 8px}
+  .topbar-right #dateRangeBtn{min-width:160px !important;font-size:11px}
+  #resetBtn{display:none}
+}
+@media (max-width:960px){
+  .sidebar{width:52px;overflow:hidden}
+  .sidebar-logo span,.nav-section,.nav-item span:not(:first-child){display:none}
+  .sidebar-logo{justify-content:center;padding:12px 0}
+  .nav-item{justify-content:center;padding:10px 0}
+  .main-content{margin-left:52px}
+  .topbar-right select{max-width:100px;font-size:11px}
+  #partnerFilter,#listFilter,#typeFilter{display:none}
+}
+@media (max-width:700px){
+  .topbar{flex-direction:column;align-items:flex-start;padding:10px 12px}
+  .topbar-right{width:100%;overflow-x:auto;flex-wrap:nowrap;padding-bottom:4px}
+  .topbar-right select{flex-shrink:0}
+  .sidebar{display:none}
+  .main-content{margin-left:0;padding:12px}
+  .kpi-grid{grid-template-columns:1fr 1fr !important}
+  .card{padding:14px}
+  canvas{max-height:240px}
+}
 
 /* ── COLUMN FILTERS ────────────────────── */
 .col-filter-icon{
@@ -366,8 +395,8 @@ tbody tr:hover{background:#F8FAFC}
           </span>
           <span style="font-size:9px;opacity:.6">▼</span>
         </button>
-        <div id="datePickerPopover" style="display:none;position:absolute;top:calc(100% + 6px);right:0;background:#fff;border:1px solid #E2E8F0;border-radius:10px;padding:14px;box-shadow:0 12px 36px rgba(0,0,0,0.12);z-index:1500;min-width:560px">
-          <div style="display:grid;grid-template-columns:200px 1fr;gap:14px">
+        <div id="datePickerPopover" style="display:none;position:fixed;background:#fff;border:1px solid #E2E8F0;border-radius:10px;padding:14px;box-shadow:0 12px 36px rgba(0,0,0,0.15);z-index:1500;width:min(520px,94vw)">
+          <div id="datePickerInner" style="display:grid;grid-template-columns:180px 1fr;gap:14px">
             <div style="border-right:1px solid #E2E8F0;padding-right:14px">
               <div style="font-size:10px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Presets</div>
               <div id="datePresets" style="display:flex;flex-direction:column;gap:2px"></div>
@@ -413,7 +442,7 @@ tbody tr:hover{background:#F8FAFC}
         <option value="Fresh">Fresh</option>
         <option value="Clicked">Clicked</option>
       </select>
-      <button onclick="resetFilters()" style="background:transparent;color:#64748B;border:1.5px solid #E2E8F0;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">Reset</button>
+      <button id="resetBtn" onclick="resetFilters()" style="background:transparent;color:#64748B;border:1.5px solid #E2E8F0;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">Reset</button>
       <div style="display:flex;align-items:center;gap:6px;padding:6px 12px;border:1.5px solid #E2E8F0;border-radius:8px;background:#F8FAFC">
         <span id="dbDot" style="width:8px;height:8px;border-radius:50%;background:#f59e0b;flex-shrink:0;transition:background .3s"></span>
         <span id="dbLabel" style="font-size:11px;font-weight:600;color:#64748B;white-space:nowrap">Connecting…</span>
@@ -2323,8 +2352,29 @@ function clearDateRange() {
 function toggleDatePicker(ev) {
   if (ev) ev.stopPropagation();
   const pop = document.getElementById('datePickerPopover');
-  pop.style.display = pop.style.display === 'none' ? 'block' : 'none';
+  const btn = document.getElementById('dateRangeBtn');
+  const isOpen = pop.style.display !== 'none';
+  if (isOpen) { pop.style.display = 'none'; return; }
+
+  // Collapse to single-column on narrow viewports
+  const inner = document.getElementById('datePickerInner');
+  const narrow = window.innerWidth < 540;
+  inner.style.gridTemplateColumns = narrow ? '1fr' : '180px 1fr';
+  const presetBorder = inner.querySelector('div[style*="border-right"]');
+  if (presetBorder) presetBorder.style.borderRight = narrow ? 'none' : '1px solid #E2E8F0';
+
+  pop.style.display = 'block';
   renderDatePresets();
+
+  // Smart positioning: anchor below the button, clamp to viewport
+  const rect = btn.getBoundingClientRect();
+  const popW = Math.min(520, window.innerWidth * 0.94);
+  let left = rect.right - popW;
+  if (left < 8) left = 8;
+  let top = rect.bottom + 6;
+  if (top + 380 > window.innerHeight) top = rect.top - 390;
+  pop.style.left = left + 'px';
+  pop.style.top = top + 'px';
 }
 
 // Close date picker when clicking outside
