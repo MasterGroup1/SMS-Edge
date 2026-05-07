@@ -1598,7 +1598,7 @@ async function initSupabase() {
   try {
     sb = supabase.createClient(SB_URL, SB_KEY);
     const [{ data: dbCamps, error: campErr }, { data: dbContent, error: contErr }] = await Promise.all([
-      sb.from('campaigns').select('*').order('date', { ascending: false }),
+      sb.from('campaigns').select('*').order('date', { ascending: false }).limit(10000),
       sb.from('content_rows').select('*').order('sort_order')
     ]);
     if (!campErr && dbCamps && dbCamps.length > 0) {
@@ -1803,7 +1803,13 @@ let activeDatePreset = 'all';
 function computeDateRange(key) {
   const today = new Date();
   today.setHours(0,0,0,0);
-  const toISO = d => d.toISOString().slice(0,10);
+  // Use LOCAL date components to avoid UTC offset shifting the date backward
+  const toISO = d => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth()+1).padStart(2,'0');
+    const day = String(d.getDate()).padStart(2,'0');
+    return `${y}-${m}-${day}`;
+  };
   let from = '', to = '';
   if (key === 'all') return {from: '', to: ''};
   if (key === 'today') { from = to = toISO(today); }
