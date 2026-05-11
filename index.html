@@ -3791,11 +3791,10 @@ function rebuildFilterOptions() {
   document.getElementById('listFilter').innerHTML = '<option value="">All lists</option>' +
     uniqueLists.map(l => `<option value="${l}">${l}</option>`).join('');
 
-  // Update date range bounds
+  // Only set earliest available date as min; never cap max so user can pick today
   const allDates = campaigns.map(c => c.date).filter(Boolean).sort();
   if (allDates.length) {
     document.getElementById('dateFrom').min = allDates[0];
-    document.getElementById('dateTo').max = allDates[allDates.length-1];
   }
 }
 
@@ -3824,13 +3823,11 @@ function initApp() {
   document.getElementById('listFilter').innerHTML = '<option value="">All lists</option>' +
     lsts.map(l => `<option value="${l}">${l}</option>`).join('');
 
-  // Set date range bounds from data
+  // Only set earliest available date as min; never cap max so user can always pick today
   const allDates = campaigns.map(c => c.date).filter(Boolean).sort();
   if (allDates.length) {
     document.getElementById('dateFrom').min = allDates[0];
-    document.getElementById('dateFrom').max = allDates[allDates.length-1];
     document.getElementById('dateTo').min = allDates[0];
-    document.getElementById('dateTo').max = allDates[allDates.length-1];
   }
 }
 
