@@ -3643,8 +3643,19 @@ function parseCSVData(text) {
 
     const get = (col) => (row[colIdx[col]] || '').trim();
     const getNum = (col) => {
-      let v = get(col).replace(/[^0-9.\-]/g, '');
-      if (v === '' || v === '-' || v === '.') return 0;
+      let v = get(col).replace(/[^\d.,-]/g, ''); // strip currency symbols, keep digits/dot/comma/minus
+      if (!v || v === '-') return 0;
+      // Detect decimal separator: if comma comes after the last dot → European format (1.234,56)
+      // otherwise American format (1,234.56)
+      const lastDot = v.lastIndexOf('.');
+      const lastComma = v.lastIndexOf(',');
+      if (lastComma > lastDot) {
+        // European: dot = thousands sep, comma = decimal → remove dots, swap comma→dot
+        v = v.replace(/\./g, '').replace(',', '.');
+      } else {
+        // American: comma = thousands sep → remove commas
+        v = v.replace(/,/g, '');
+      }
       return parseFloat(v) || 0;
     };
     const getInt = (col) => Math.round(getNum(col));
