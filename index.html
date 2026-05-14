@@ -1678,13 +1678,14 @@ async function initSupabase() {
     ]);
     if (!campErr && dbCamps && dbCamps.length > 0) {
       campaigns.length = 0;
+      const n = v => Number(v) || 0; // ensure numeric — Supabase may return strings
       dbCamps.forEach(r => campaigns.push({
         id: r.id, name: r.name, country: r.country || '', brand: r.brand || '',
-        type: r.type || 'Fresh', list: r.list || '', laps: r.laps || 0,
-        sent: r.sent || 0, clicks: r.clicks || 0, leads: r.leads || 0,
-        sales: r.sales || 0, cost: r.cost || 0, revenue: r.revenue || 0,
-        roi: r.roi || 0, ctr: r.ctr || 0, cpa: r.cpa || 0, ecpa: r.ecpa || 0,
-        breakeven: r.breakeven || 0, profitable: r.profitable || false,
+        type: r.type || 'Fresh', list: r.list || '', laps: n(r.laps),
+        sent: n(r.sent), clicks: n(r.clicks), leads: n(r.leads),
+        sales: n(r.sales), cost: n(r.cost), revenue: n(r.revenue),
+        roi: n(r.roi), ctr: n(r.ctr), cpa: n(r.cpa), ecpa: n(r.ecpa),
+        breakeven: n(r.breakeven), profitable: r.profitable || false,
         created: r.created || '', date: r.date || '',
         rawList: r.raw_list || '', partner: r.partner || ''
       }));
@@ -2201,16 +2202,16 @@ function switchTab(tabName) {
 function updateKPIs() {
   const total_camps = filteredCampaigns.length;
   const profitable = filteredCampaigns.filter(c => c.profitable).length;
-  const total_sales = filteredCampaigns.reduce((s,c) => s+c.sales, 0);
-  const total_leads = filteredCampaigns.reduce((s,c) => s+c.leads, 0);
-  const total_cost = filteredCampaigns.reduce((s,c) => s+c.cost, 0);
+  const total_sales = filteredCampaigns.reduce((s,c) => s + (Number(c.sales)||0), 0);
+  const total_leads = filteredCampaigns.reduce((s,c) => s + (Number(c.leads)||0), 0);
+  const total_cost  = filteredCampaigns.reduce((s,c) => s + (Number(c.cost)||0), 0);
   const total_revenue = total_sales * 20;
   const roi = total_cost > 0 ? (total_revenue - total_cost) / total_cost : 0;
   const ecpa_reg = total_leads > 0 ? total_cost / total_leads : 0;
   const ecpa_ftd = total_sales > 0 ? total_cost / total_sales : 0;
 
-  const total_sent = filteredCampaigns.reduce((s,c) => s+c.sent, 0);
-  const total_clicks = filteredCampaigns.reduce((s,c) => s+c.clicks, 0);
+  const total_sent = filteredCampaigns.reduce((s,c) => s + (Number(c.sent)||0), 0);
+  const total_clicks = filteredCampaigns.reduce((s,c) => s + (Number(c.clicks)||0), 0);
   const overall_ctr = total_sent > 0 ? (total_clicks / total_sent * 100).toFixed(2) : '0.00';
 
   document.getElementById('kpi-camps').innerText = fmtN(total_camps);
