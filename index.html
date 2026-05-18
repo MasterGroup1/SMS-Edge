@@ -3795,12 +3795,8 @@ function partnerColor(partner) {
 function normalizeListName(name) {
   if (!name) return '';
   return name.trim()
-    // Royboy → Roy Boy (all case variants)
-    .replace(/\broyboy\b/gi, 'Roy Boy')
-    // Roy_Boy → Roy Boy
-    .replace(/\broy_boy\b/gi, 'Roy Boy')
-    // SMS Data list names belong to Artium — keep list name as-is (partner derived separately)
-    // Normalize extra spaces
+    .replace(/royboy/gi, 'Roy Boy')   // "Royboy_AU_..." → "Roy Boy_AU_..."
+    .replace(/Roy_Boy/gi, 'Roy Boy')  // "Roy_Boy_AU_..." → "Roy Boy_AU_..."
     .replace(/\s+/g, ' ');
 }
 
