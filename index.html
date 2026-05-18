@@ -1687,7 +1687,9 @@ async function initSupabase() {
         roi: n(r.roi), ctr: n(r.ctr), cpa: n(r.cpa), ecpa: n(r.ecpa),
         breakeven: n(r.breakeven), profitable: r.profitable || false,
         created: r.created || '', date: r.date || '',
-        rawList: r.raw_list || '', partner: r.partner || ''
+        rawList: r.raw_list || '',
+        // Re-derive partner from list name in case old DB rows have blank/wrong partner
+        partner: r.partner || extractPartnerJS(r.raw_list || '') || ''
       }));
       filteredCampaigns = [...campaigns];
     } else {
@@ -2215,7 +2217,7 @@ function updateKPIs() {
   const overall_ctr = total_sent > 0 ? (total_clicks / total_sent * 100).toFixed(2) : '0.00';
 
   document.getElementById('kpi-camps').innerText = fmtN(total_camps);
-  document.getElementById('kpi-camps').title = total_camps + ' total campaigns (' + profitable + ' profitable, ' + (total_camps - profitable) + ' unprofitable)';
+  document.getElementById('kpi-camps').title = total_camps + ' total campaigns (' + profitable + ' profitable, ' + (total_camps - profitable) + ' unprofitable). A campaign is profitable when sales × €20 revenue exceeds total SMS cost.';
   document.getElementById('kpi-camps-sub').innerText = profitable + ' profitable';
 
   document.getElementById('kpi-sales').innerText = fmtN(total_sales);
@@ -3238,15 +3240,11 @@ function initTopListsChart() {
     items = items.sort((a,b) => b.leads - a.leads).slice(0, 12);
   }
 
-  const partnerPalette = ['#3B82F6','#10B981','#F59E0B','#EC4899','#8B5CF6','#EF4444','#14B8A6','#F97316','#6366F1','#84CC16'];
   let getColor;
   if (topListsMode === 'country') {
     getColor = (item) => countryColor(item.country);
   } else {
-    const uniquePartners = [...new Set(items.map(i => i.partner || 'Unknown'))];
-    const partnerColorMap = {};
-    uniquePartners.forEach((p,i) => partnerColorMap[p] = partnerPalette[i % partnerPalette.length]);
-    getColor = (item) => partnerColorMap[item.partner || 'Unknown'];
+    getColor = (item) => partnerColor(item.partner || 'Unknown');
   }
 
   chartInstances['topLists'] = new Chart(ctx, {
@@ -3333,15 +3331,16 @@ function initTopListsChart() {
   // Render color legend
   const legendEl = document.getElementById('topListsLegend');
   if (legendEl) {
-    const seen = new Set();
-    const legendItems = [];
-    items.forEach(i => {
-      const group = topListsMode === 'country' ? i.country : (i.partner || 'Unknown');
-      if (!seen.has(group)) {
-        seen.add(group);
-        legendItems.push({label: group, color: getColor(i)});
-      }
-    });
+    let legendItems = [];
+    if (topListsMode === 'country') {
+      const seen = new Set();
+      items.forEach(i => {
+        if (!seen.has(i.country)) { seen.add(i.country); legendItems.push({label: i.country, color: countryColor(i.country)}); }
+      });
+    } else {
+      // Always show all known partners with fixed colors
+      legendItems = ALL_KNOWN_PARTNERS.map(p => ({label: p, color: partnerColor(p)}));
+    }
     legendEl.innerHTML = legendItems.map(l =>
       `<span style="display:flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:#334155">` +
       `<span style="width:10px;height:10px;border-radius:2px;background:${l.color};flex-shrink:0"></span>${l.label}</span>`
@@ -3775,13 +3774,32 @@ function parseCSVDate(v) {
   return '';
 }
 
+// Fixed partner colors — consistent across all charts
+const PARTNER_COLORS = {
+  'Roy Boy':  '#3B82F6',   // blue
+  'Artium':   '#10B981',   // green
+  'Lilly':    '#F59E0B',   // amber
+  'Hanni':    '#EC4899',   // pink
+  'Unknown':  '#94A3B8',   // grey
+};
+const ALL_KNOWN_PARTNERS = ['Roy Boy', 'Artium', 'Lilly', 'Hanni'];
+
+function partnerColor(partner) {
+  return PARTNER_COLORS[partner] || '#8B5CF6';
+}
+
 function extractPartnerJS(listName) {
   if (!listName) return '';
-  // Roy Boy check (has space in name)
-  if (listName.toLowerCase().startsWith('roy boy') || listName.toLowerCase().startsWith('royboy')) {
-    return 'Roy Boy';
-  }
-  // Otherwise take first token before _ - or space
+  const l = listName.toLowerCase();
+  // Roy Boy / Royboy
+  if (l.startsWith('roy boy') || l.startsWith('royboy')) return 'Roy Boy';
+  // Artium or SMS Data (Artium-sourced lists)
+  if (l.startsWith('artium') || l.startsWith('sms data') || l.startsWith('sms_data')) return 'Artium';
+  // Lilly
+  if (l.startsWith('lilly')) return 'Lilly';
+  // Hanni
+  if (l.startsWith('hanni')) return 'Hanni';
+  // First token before _ or space
   const match = listName.match(/^([^_\- ]+)/);
   return match ? match[1] : listName;
 }
