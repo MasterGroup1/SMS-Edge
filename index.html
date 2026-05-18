@@ -1687,7 +1687,7 @@ async function initSupabase() {
         roi: n(r.roi), ctr: n(r.ctr), cpa: n(r.cpa), ecpa: n(r.ecpa),
         breakeven: n(r.breakeven), profitable: r.profitable || false,
         created: r.created || '', date: r.date || '',
-        rawList: r.raw_list || '',
+        rawList: normalizeListName(r.raw_list || ''),
         // Re-derive partner from list name in case old DB rows have blank/wrong partner
         partner: r.partner || extractPartnerJS(r.raw_list || '') || ''
       }));
@@ -2446,12 +2446,15 @@ function recomputeAggregates() {
     const bg = brandGroups[c.brand];
     bg.camps += 1; bg.sent += c.sent; bg.clicks += c.clicks; bg.leads += c.leads; bg.sales += c.sales; bg.cost += c.cost;
 
-    // List grouping (Fresh only)
-    if (c.type === 'Fresh' && c.rawList) {
-      if (!listGroups[c.rawList]) {
-        listGroups[c.rawList] = {list: c.rawList, camps: 0, sent: 0, clicks: 0, leads: 0, sales: 0, cost: 0, _countries: new Set(), _dates: [], _laps: 0, _campaigns: []};
+    // List grouping (Fresh only) — normalize key so "Royboy_AU_..." and "Roy Boy_AU_..." merge
+    const nList = c.rawList ? normalizeListName(c.rawList) : '';
+    if (c.type === 'Fresh' && nList) {
+      // Keep the campaign's rawList in sync with normalised form
+      c.rawList = nList;
+      if (!listGroups[nList]) {
+        listGroups[nList] = {list: nList, camps: 0, sent: 0, clicks: 0, leads: 0, sales: 0, cost: 0, _countries: new Set(), _dates: [], _laps: 0, _campaigns: []};
       }
-      const lg = listGroups[c.rawList];
+      const lg = listGroups[nList];
       lg.camps += 1; lg.sent += c.sent; lg.clicks += c.clicks; lg.leads += c.leads; lg.sales += c.sales; lg.cost += c.cost;
       if (c.country) lg._countries.add(c.country);
       if (c.date) lg._dates.push(c.date);
@@ -2460,10 +2463,10 @@ function recomputeAggregates() {
     }
 
     // Combo grouping (Fresh only)
-    if (c.type === 'Fresh' && c.rawList) {
-      const comboKey = c.rawList + '|' + c.brand + '|' + c.country;
+    if (c.type === 'Fresh' && nList) {
+      const comboKey = nList + '|' + c.brand + '|' + c.country;
       if (!comboGroups[comboKey]) {
-        comboGroups[comboKey] = {list: c.rawList, brand: c.brand, country: c.country, sends: 0, sent: 0, clicks: 0, leads: 0, sales: 0, cost: 0};
+        comboGroups[comboKey] = {list: nList, brand: c.brand, country: c.country, sends: 0, sent: 0, clicks: 0, leads: 0, sales: 0, cost: 0};
       }
       const cbg = comboGroups[comboKey];
       cbg.sends += 1; cbg.sent += c.sent; cbg.clicks += c.clicks; cbg.leads += c.leads; cbg.sales += c.sales; cbg.cost += c.cost;
@@ -3702,8 +3705,8 @@ function parseCSVData(text) {
 
     result.push({
       id, name, country, brand, type,
-      list: listName || (isClicked ? name : ''),
-      rawList: listName,
+      list: normalizeListName(listName) || (isClicked ? name : ''),
+      rawList: normalizeListName(listName),
       laps, sent, clicks, leads, sales,
       cost: Math.round(cost * 100) / 100,
       revenue: Math.round(revenue * 100) / 100,
@@ -3786,6 +3789,19 @@ const ALL_KNOWN_PARTNERS = ['Roy Boy', 'Artium', 'Lilly', 'Hanni'];
 
 function partnerColor(partner) {
   return PARTNER_COLORS[partner] || '#8B5CF6';
+}
+
+// Normalize list names so "Royboy_AU_..." and "Roy Boy_AU_..." are treated as the same list
+function normalizeListName(name) {
+  if (!name) return '';
+  return name.trim()
+    // Royboy → Roy Boy (all case variants)
+    .replace(/\broyboy\b/gi, 'Roy Boy')
+    // Roy_Boy → Roy Boy
+    .replace(/\broy_boy\b/gi, 'Roy Boy')
+    // SMS Data list names belong to Artium — keep list name as-is (partner derived separately)
+    // Normalize extra spaces
+    .replace(/\s+/g, ' ');
 }
 
 function extractPartnerJS(listName) {
