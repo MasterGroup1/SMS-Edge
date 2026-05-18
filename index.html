@@ -817,7 +817,7 @@ tbody tr:hover{background:#F8FAFC}
           <th onclick="sortTable('listsTable', 12)" class="num" title="ECPA (Reg) = Total Spend ÷ Total Leads — matches main dashboard">ECPA (Reg)</th>
           <th onclick="sortTable('listsTable', 13)" title="Date of most recent campaign using this list">Last Used</th>
           <th onclick="sortTable('listsTable', 14)" class="num" title="Maximum number of send cycles (laps)">Laps</th>
-          <th onclick="sortTable('listsTable', 15)" title="Recommendation based on ROI, CTR, lead quality, and conversion scores">Use Again?</th>
+          <th onclick="sortTable('listsTable', 15)" title="Yes = sales with ECPA (FTD) ≤ €280 | Maybe = sales with ECPA > €280, or leads > 2 but no sales | No = no sales and ≤ 2 leads">Use Again?</th>
         </tr></thead>
         <tbody id="listsTable-body"></tbody>
       </table>
@@ -2490,7 +2490,14 @@ function recomputeAggregates() {
       group.countries = [...group._countries].sort().join(', ');
       group.laps = group._laps;
       group.last_used = group._dates.length ? [...group._dates].sort().pop() : '—';
-      group.reuse = group.sales > 0 ? 'Yes' : group.leads > 2 ? 'Maybe' : 'No';
+      const _ecpaFtd = group.sales > 0 ? group.cost / group.sales : Infinity;
+      if (group.sales > 0 && _ecpaFtd <= 280) {
+        group.reuse = 'Yes';
+      } else if (group.sales > 0 || group.leads > 2) {
+        group.reuse = 'Maybe';  // had sales but ECPA > €280, or has leads but no sales
+      } else {
+        group.reuse = 'No';
+      }
       group.campaigns = (group._campaigns || []).slice().sort((a,b) => (b.date||'').localeCompare(a.date||''));
     }
     return group;
