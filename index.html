@@ -817,7 +817,8 @@ tbody tr:hover{background:#F8FAFC}
           <th onclick="sortTable('listsTable', 12)" class="num" title="ECPA (Reg) = Total Spend ÷ Total Leads — matches main dashboard">ECPA (Reg)</th>
           <th onclick="sortTable('listsTable', 13)" title="Date of most recent campaign using this list">Last Used</th>
           <th onclick="sortTable('listsTable', 14)" class="num" title="Maximum number of send cycles (laps)">Laps</th>
-          <th onclick="sortTable('listsTable', 15)" title="Yes = sales with ECPA (FTD) ≤ €280 | Maybe = sales with ECPA > €280, or leads > 2 but no sales | No = no sales and ≤ 2 leads">Use Again?</th>
+          <th onclick="sortTable('listsTable', 15)" title="Yes = sales with ECPA (FTD) ≤ €280, or proven (>5 sends, ECPA Reg <€280) | Maybe = sales but ECPA >€280, or leads >2 | No = no results">Use Again?</th>
+          <th onclick="sortTable('listsTable', 16)" title="Specific reasons why this list may not be worth reusing">Reasons Not to Use</th>
         </tr></thead>
         <tbody id="listsTable-body"></tbody>
       </table>
@@ -2491,13 +2492,24 @@ function recomputeAggregates() {
       group.laps = group._laps;
       group.last_used = group._dates.length ? [...group._dates].sort().pop() : '—';
       const _ecpaFtd = group.sales > 0 ? group.cost / group.sales : Infinity;
-      if (group.sales > 0 && _ecpaFtd <= 280) {
+      const _ecpaReg = group.leads > 0 ? group.cost / group.leads : Infinity;
+      const _proven  = group.camps > 5 && _ecpaReg < 280 && group.leads > 5;
+      if ((group.sales > 0 && _ecpaFtd <= 280) || _proven) {
         group.reuse = 'Yes';
       } else if (group.sales > 0 || group.leads > 2) {
-        group.reuse = 'Maybe';  // had sales but ECPA > €280, or has leads but no sales
+        group.reuse = 'Maybe';
       } else {
         group.reuse = 'No';
       }
+      // Build "Reasons Not to Use" explanation
+      const _reasons = [];
+      if (_ecpaFtd < Infinity && _ecpaFtd > 280) _reasons.push('ECPA (FTD) €' + _ecpaFtd.toFixed(0) + ' > €280');
+      if (group.sales === 0 && group.camps >= 3) _reasons.push('No sales after ' + group.camps + ' campaigns');
+      if (group.leads === 0 && group.camps >= 2) _reasons.push('No leads generated');
+      if (group.ctr < 0.01 && group.camps >= 2) _reasons.push('CTR below 1%');
+      if (group.click_to_lead < 0.05 && group.clicks > 50) _reasons.push('Cl→Lead below 5%');
+      if (group.camps <= 2 && group.reuse === 'Yes') _reasons.push('Only ' + group.camps + ' send(s) — validate further');
+      group.reason = _reasons.length > 0 ? _reasons.join(' · ') : (group.reuse === 'Yes' ? '—' : '—');
       group.campaigns = (group._campaigns || []).slice().sort((a,b) => (b.date||'').localeCompare(a.date||''));
     }
     return group;
@@ -2602,7 +2614,7 @@ function renderBrandsTable() {
 
 function renderListsTable() {
   const tbody = document.getElementById('listsTable-body');
-  const COLS = 16; // total columns in table
+  const COLS = 17; // total columns in table
 
   tbody.innerHTML = filteredLists.map((l, idx) => {
     const ecpa_ftd = l.sales > 0 ? l.cost / l.sales : 0;
@@ -2664,6 +2676,7 @@ function renderListsTable() {
       <td style="font-size:11px">${l.last_used || '—'}</td>
       <td class="num">${l.laps}</td>
       <td style="font-weight:600;color:${l.reuse==='Yes'?'#16A34A':l.reuse==='Maybe'?'#F59E0B':'#DC2626'}">${l.reuse}</td>
+      <td style="font-size:11px;color:${l.reason&&l.reason!=='—'?'#DC2626':'#94A3B8'};max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${l.reason||'—'}">${l.reason||'—'}</td>
     </tr>`;
 
     const detailRow = `<tr class="list-detail-row" id="${lid}" style="display:none">
@@ -2692,7 +2705,7 @@ function renderListsTable() {
     return summaryRow + detailRow;
   }).join('');
 
-  initColToggle('listsTable', ['List', 'Countries', 'Campaigns', 'Sent', 'Clicks', 'CTR', 'Leads', 'Cl→Lead', 'Sales', 'L→Sale', 'Cost', 'ECPA (FTD)', 'ECPA (Reg)', 'Last Used', 'Laps', 'Use Again?']);
+  initColToggle('listsTable', ['List', 'Countries', 'Campaigns', 'Sent', 'Clicks', 'CTR', 'Leads', 'Cl→Lead', 'Sales', 'L→Sale', 'Cost', 'ECPA (FTD)', 'ECPA (Reg)', 'Last Used', 'Laps', 'Use Again?', 'Reasons Not to Use']);
   attachColumnFilters('listsTable');
 }
 
@@ -3803,8 +3816,11 @@ function normalizeListName(name) {
   if (!name) return '';
   return name.trim()
     .replace(/royboy/gi, 'Roy Boy')   // "Royboy_AU_..." → "Roy Boy_AU_..."
-    .replace(/Roy_Boy/gi, 'Roy Boy')  // "Roy_Boy_AU_..." → "Roy Boy_AU_..."
-    .replace(/\s+/g, ' ');
+    .replace(/Roy_Boy/gi, 'Roy Boy')  // "Roy_Boy_..." → "Roy Boy_..."
+    .replace(/ _/g, '_')             // "Artium _15052026" → "Artium_15052026"
+    .replace(/_ /g, '_')             // "IT_ 30032026" → "IT_30032026"
+    .replace(/\s+/g, ' ')            // collapse multiple spaces
+    .trim();
 }
 
 function extractPartnerJS(listName) {
