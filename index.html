@@ -2503,13 +2503,22 @@ function recomputeAggregates() {
       }
       // Build "Reasons Not to Use" explanation
       const _reasons = [];
-      if (_ecpaFtd < Infinity && _ecpaFtd > 280) _reasons.push('ECPA (FTD) €' + _ecpaFtd.toFixed(0) + ' > €280');
+      if (_ecpaFtd < Infinity && _ecpaFtd > 280) _reasons.push('ECPA (FTD) €' + _ecpaFtd.toFixed(0) + ' > €280 limit');
       if (group.sales === 0 && group.camps >= 3) _reasons.push('No sales after ' + group.camps + ' campaigns');
-      if (group.leads === 0 && group.camps >= 2) _reasons.push('No leads generated');
-      if (group.ctr < 0.01 && group.camps >= 2) _reasons.push('CTR below 1%');
+      if (group.leads === 0 && group.camps >= 2) _reasons.push('Zero leads across ' + group.camps + ' sends');
+      if (group.leads === 0 && group.camps === 1) _reasons.push('Zero leads — single send, no engagement');
+      if (group.ctr < 0.01 && group.camps >= 2) _reasons.push('CTR below 1% — list not engaging');
       if (group.click_to_lead < 0.05 && group.clicks > 50) _reasons.push('Cl→Lead below 5%');
       if (group.camps <= 2 && group.reuse === 'Yes') _reasons.push('Only ' + group.camps + ' send(s) — validate further');
-      group.reason = _reasons.length > 0 ? _reasons.join(' · ') : (group.reuse === 'Yes' ? '—' : '—');
+      // For hard No with no specific reason yet, always generate one
+      if (group.reuse === 'No' && _reasons.length === 0) {
+        if (group.leads <= 2 && group.sales === 0) {
+          _reasons.push('No meaningful results (' + group.leads + ' lead' + (group.leads === 1 ? '' : 's') + ', 0 sales)');
+        } else {
+          _reasons.push('Insufficient performance for reuse');
+        }
+      }
+      group.reason = _reasons.length > 0 ? _reasons.join(' · ') : '—';
       group.campaigns = (group._campaigns || []).slice().sort((a,b) => (b.date||'').localeCompare(a.date||''));
     }
     return group;
