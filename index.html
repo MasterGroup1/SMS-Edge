@@ -767,9 +767,9 @@ tbody tr:hover{background:#F8FAFC}
     <!-- CHARTS ROW -->
     <div class="grid-2" style="margin-bottom:24px">
       <div class="card">
-        <div class="card-header"><div class="card-title">Click→Lead Rate by List</div></div>
+        <div class="card-header"><div class="card-title">Sent→Click Rate by List</div></div>
         <div class="chart-wrap">
-          <canvas id="chartListCL2L"></canvas>
+          <canvas id="chartListCTR"></canvas>
         </div>
       </div>
       <div class="card">
@@ -817,8 +817,9 @@ tbody tr:hover{background:#F8FAFC}
           <th onclick="sortTable('listsTable', 12)" class="num" title="ECPA (Reg) = Total Spend ÷ Total Leads — matches main dashboard">ECPA (Reg)</th>
           <th onclick="sortTable('listsTable', 13)" title="Date of most recent campaign using this list">Last Used</th>
           <th onclick="sortTable('listsTable', 14)" class="num" title="Maximum number of send cycles (laps)">Laps</th>
-          <th onclick="sortTable('listsTable', 15)" title="Yes = sales with ECPA (FTD) ≤ €280, or proven (>5 sends, ECPA Reg <€280) | Maybe = sales but ECPA >€280, or leads >2 | No = no results">Use Again?</th>
-          <th onclick="sortTable('listsTable', 16)" title="Specific reasons why this list may not be worth reusing">Reasons Not to Use</th>
+          <th onclick="sortTable('listsTable', 15)" title="Yes = sales with ECPA (FTD) ≤ €280, or proven (>5 sends, ECPA Reg <€280) | Maybe = sales but ECPA >€280, or leads >2 | No = no results. Select Yes/Maybe/No to manually override, or 'auto' to use the computed score.">Use Again?</th>
+          <th onclick="sortTable('listsTable', 16)" title="Specific reasons why this list may not be worth reusing — editable">Reasons Not to Use</th>
+          <th onclick="sortTable('listsTable', 17)" title="Date this Use Again decision was made or last reviewed">Decision Date</th>
         </tr></thead>
         <tbody id="listsTable-body"></tbody>
       </table>
@@ -1654,6 +1655,15 @@ tbody tr:hover{background:#F8FAFC}
 
 </div>
 
+<div id="historyOverlay" onclick="closeHistoryModal()" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.5);z-index:299"></div>
+<div id="historyModal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:10px;box-shadow:0 20px 60px rgba(0,0,0,.25);z-index:300;max-width:480px;width:90%;max-height:70vh;overflow-y:auto;padding:20px">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <div style="font-size:14px;font-weight:700;color:#0F172A" id="historyModalTitle">Decision History</div>
+    <button onclick="closeHistoryModal()" style="border:none;background:transparent;font-size:18px;cursor:pointer;color:#94A3B8">×</button>
+  </div>
+  <div id="historyModalBody" style="font-size:12px;color:#334155"></div>
+</div>
+
 <script>
 // ── SUPABASE ──────────────────────────────────────────────────
 const SB_URL = 'https://eysbtgozvqpfaudfcpsg.supabase.co';
@@ -1673,10 +1683,15 @@ async function initSupabase() {
   setDbStatus('connecting', 'Connecting…');
   try {
     sb = supabase.createClient(SB_URL, SB_KEY);
-    const [{ data: dbCamps, error: campErr }, { data: dbContent, error: contErr }] = await Promise.all([
+    const [{ data: dbCamps, error: campErr }, { data: dbContent, error: contErr }, { data: dbDecisions, error: decErr }] = await Promise.all([
       sb.from('campaigns').select('*').order('date', { ascending: false }).limit(10000),
-      sb.from('content_rows').select('*').order('sort_order')
+      sb.from('content_rows').select('*').order('sort_order'),
+      sb.from('list_decisions').select('*')
     ]);
+    if (!decErr && dbDecisions) {
+      listDecisions = {};
+      dbDecisions.forEach(d => { listDecisions[d.list] = d; });
+    }
     if (!campErr && dbCamps && dbCamps.length > 0) {
       campaigns.length = 0;
       const n = v => Number(v) || 0; // ensure numeric — Supabase may return strings
@@ -1745,6 +1760,91 @@ async function syncContentRow(idx) {
 async function deleteContentRowFromDB(id) {
   if (!sb || !id) return;
   await sb.from('content_rows').delete().eq('id', id);
+}
+
+// ── LIST DECISIONS (manual Use Again override + audit trail) ──
+async function saveListDecision(list, useAgain, reason, decisionDate) {
+  if (!sb) { alert('Not connected to Supabase — decision not saved'); return; }
+  decisionDate = decisionDate || new Date().toISOString().slice(0, 10);
+  const row = { list, use_again: useAgain || null, reason: reason || '', decision_date: decisionDate };
+  await sb.from('list_decisions').upsert(row, { onConflict: 'list' });
+  await sb.from('list_decision_history').insert(row);
+  listDecisions[list] = row;
+  recomputeAggregates();
+  renderListsTable();
+}
+
+async function clearListDecision(list) {
+  if (!sb) { alert('Not connected to Supabase — decision not cleared'); return; }
+  await sb.from('list_decisions').delete().eq('list', list);
+  await sb.from('list_decision_history').insert({ list, use_again: null, reason: '', decision_date: null });
+  delete listDecisions[list];
+  recomputeAggregates();
+  renderListsTable();
+}
+
+async function viewListHistory(list) {
+  if (!sb) { alert('Not connected to Supabase'); return; }
+  const { data, error } = await sb.from('list_decision_history')
+    .select('*').eq('list', list).order('changed_at', { ascending: false });
+  if (error) { alert('Failed to load decision history'); return; }
+  showHistoryModal(list, data || []);
+}
+
+function showHistoryModal(list, entries) {
+  document.getElementById('historyModalTitle').textContent = 'Decision History — ' + list;
+  const body = document.getElementById('historyModalBody');
+  if (!entries.length) {
+    body.innerHTML = '<div style="color:#94A3B8">No manual decisions recorded yet.</div>';
+  } else {
+    body.innerHTML = entries.map(e => {
+      const color = e.use_again === 'Yes' ? '#16A34A' : e.use_again === 'Maybe' ? '#F59E0B' : e.use_again === 'No' ? '#DC2626' : '#94A3B8';
+      const when = e.changed_at ? new Date(e.changed_at).toLocaleString() : '—';
+      return `<div style="padding:8px 0;border-bottom:1px solid #F1F5F9">
+        <div style="font-weight:600;color:${color}">${e.use_again || 'Cleared (reverted to auto)'}</div>
+        <div style="color:#64748B;margin-top:2px">${e.reason || '—'}</div>
+        <div style="font-size:11px;color:#94A3B8;margin-top:2px">Decision date: ${e.decision_date || '—'} · Changed ${when}</div>
+      </div>`;
+    }).join('');
+  }
+  document.getElementById('historyOverlay').style.display = 'block';
+  document.getElementById('historyModal').style.display = 'block';
+}
+
+function closeHistoryModal() {
+  document.getElementById('historyOverlay').style.display = 'none';
+  document.getElementById('historyModal').style.display = 'none';
+}
+
+function escAttr(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+}
+
+function onUseAgainChange(sel) {
+  const list = sel.dataset.list;
+  const val = sel.value;
+  const row = filteredLists.find(l => l.list === list);
+  if (val === '') { clearListDecision(list); return; }
+  const reason = row ? row.reason : '';
+  const date = (row && row.decisionDate) || new Date().toISOString().slice(0, 10);
+  saveListDecision(list, val, reason, date);
+}
+
+function onReasonBlur(input) {
+  if (input.value === input.dataset.orig) return;
+  const list = input.dataset.list;
+  const row = filteredLists.find(l => l.list === list);
+  const useAgain = row ? row.reuse : '';
+  const date = (row && row.decisionDate) || new Date().toISOString().slice(0, 10);
+  saveListDecision(list, useAgain, input.value, date);
+}
+
+function onDecisionDateChange(input) {
+  const list = input.dataset.list;
+  const row = filteredLists.find(l => l.list === list);
+  const useAgain = row ? row.reuse : '';
+  const reason = row ? row.reason : '';
+  saveListDecision(list, useAgain, reason, input.value);
 }
 
 async function seedDatabase() {
@@ -1990,6 +2090,7 @@ let filteredCountries = [...countries];
 let filteredBrands = [...brands];
 let filteredLists = [...lists];
 let filteredCombos = [...combos];
+let listDecisions = {}; // manual Use Again overrides, keyed by normalized list name — see recomputeAggregates()
 
 // Questions state
 let questions = [
@@ -2520,6 +2621,20 @@ function recomputeAggregates() {
       }
       group.reason = _reasons.length > 0 ? _reasons.join(' · ') : '—';
       group.campaigns = (group._campaigns || []).slice().sort((a,b) => (b.date||'').localeCompare(a.date||''));
+
+      // Manual override from list_decisions, if a team member has set one
+      group.autoReuse = group.reuse;
+      group.autoReason = group.reason;
+      const _manual = listDecisions[group.list];
+      if (_manual && _manual.use_again) {
+        group.reuse = _manual.use_again;
+        group.reason = _manual.reason || group.reason;
+        group.decisionDate = _manual.decision_date || '';
+        group.isManual = true;
+      } else {
+        group.decisionDate = '';
+        group.isManual = false;
+      }
     }
     return group;
   };
@@ -2623,7 +2738,7 @@ function renderBrandsTable() {
 
 function renderListsTable() {
   const tbody = document.getElementById('listsTable-body');
-  const COLS = 17; // total columns in table
+  const COLS = 18; // total columns in table
 
   tbody.innerHTML = filteredLists.map((l, idx) => {
     const ecpa_ftd = l.sales > 0 ? l.cost / l.sales : 0;
@@ -2663,7 +2778,7 @@ function renderListsTable() {
       </tr>`;
     }).join('');
 
-    const summaryRow = `<tr class="list-summary-row" data-lid="${lid}">
+    const summaryRow = `<tr class="list-summary-row" data-lid="${lid}" data-list="${escAttr(l.list)}">
       <td style="white-space:nowrap">
         <div style="display:flex;align-items:center;gap:6px">
           <button class="list-expand-btn" id="btn-${lid}" onclick="toggleListDetail('${lid}')" title="Show all ${listCampaigns.length} campaigns">▶</button>
@@ -2684,8 +2799,21 @@ function renderListsTable() {
       <td class="num" style="color:${ecpa_reg===0?'#94A3B8':ecpa_reg<20?'#16A34A':ecpa_reg<50?'#F59E0B':'#DC2626'};font-weight:600" title="ECPA (Reg) = €${l.cost.toFixed(2)} ÷ ${l.leads} = ${ecpa_reg>0?'€'+ecpa_reg.toFixed(2):'no leads'}">${ecpa_reg>0?fmtC2(ecpa_reg):'—'}</td>
       <td style="font-size:11px">${l.last_used || '—'}</td>
       <td class="num">${l.laps}</td>
-      <td style="font-weight:600;color:${l.reuse==='Yes'?'#16A34A':l.reuse==='Maybe'?'#F59E0B':'#DC2626'}">${l.reuse}</td>
-      <td style="font-size:11px;color:${l.reason&&l.reason!=='—'?'#DC2626':'#94A3B8'};max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${l.reason||'—'}">${l.reason||'—'}</td>
+      <td style="white-space:nowrap">
+        <select class="ua-select" data-list="${escAttr(l.list)}" onchange="onUseAgainChange(this)" title="Manually override, or select 'auto' to use the computed score" style="font-weight:600;color:${l.reuse==='Yes'?'#16A34A':l.reuse==='Maybe'?'#F59E0B':'#DC2626'};border:1px solid #E2E8F0;border-radius:4px;padding:2px 4px;font-size:11px;background:#fff;cursor:pointer">
+          <option value="" ${!l.isManual?'selected':''}>${l.autoReuse} (auto)</option>
+          <option value="Yes" ${l.isManual && l.reuse==='Yes'?'selected':''}>Yes</option>
+          <option value="Maybe" ${l.isManual && l.reuse==='Maybe'?'selected':''}>Maybe</option>
+          <option value="No" ${l.isManual && l.reuse==='No'?'selected':''}>No</option>
+        </select>
+        <button data-list="${escAttr(l.list)}" onclick="viewListHistory(this.dataset.list)" title="View decision history" style="border:none;background:transparent;cursor:pointer;color:#94A3B8;font-size:11px;vertical-align:middle;padding:0 2px">🕒</button>
+      </td>
+      <td style="font-size:11px">
+        <input type="text" class="reason-input" data-list="${escAttr(l.list)}" data-orig="${escAttr(l.reason||'')}" value="${escAttr(l.reason||'')}" onblur="onReasonBlur(this)" title="${escAttr(l.reason||'—')}" style="border:1px solid transparent;background:transparent;font-size:11px;width:200px;color:${l.reason&&l.reason!=='—'?'#DC2626':'#94A3B8'};font-family:inherit">
+      </td>
+      <td style="font-size:11px">
+        <input type="date" class="decision-date-input" data-list="${escAttr(l.list)}" value="${l.decisionDate||''}" onchange="onDecisionDateChange(this)" title="Decision date" style="border:1px solid #E2E8F0;border-radius:4px;font-size:11px;padding:2px;width:120px;font-family:inherit">
+      </td>
     </tr>`;
 
     const detailRow = `<tr class="list-detail-row" id="${lid}" style="display:none">
@@ -2714,7 +2842,7 @@ function renderListsTable() {
     return summaryRow + detailRow;
   }).join('');
 
-  initColToggle('listsTable', ['List', 'Countries', 'Campaigns', 'Sent', 'Clicks', 'CTR', 'Leads', 'Cl→Lead', 'Sales', 'L→Sale', 'Cost', 'ECPA (FTD)', 'ECPA (Reg)', 'Last Used', 'Laps', 'Use Again?', 'Reasons Not to Use']);
+  initColToggle('listsTable', ['List', 'Countries', 'Campaigns', 'Sent', 'Clicks', 'CTR', 'Leads', 'Cl→Lead', 'Sales', 'L→Sale', 'Cost', 'ECPA (FTD)', 'ECPA (Reg)', 'Last Used', 'Laps', 'Use Again?', 'Reasons Not to Use', 'Decision Date']);
   attachColumnFilters('listsTable');
 }
 
@@ -3008,6 +3136,16 @@ function switchContentSubtab(subtab) {
 // Column filter state: { tableId: { colIdx: Set(selected values) } }
 const colFilters = {};
 
+// Reads a cell's effective text for sort/filter — falls back to a contained
+// select/input's value since form controls (list decisions) have no text content.
+function cellText(row, colIdx) {
+  const cell = row.cells[colIdx];
+  if (!cell) return '';
+  const ctrl = cell.querySelector('select, input');
+  if (ctrl) return ctrl.value || '';
+  return (cell.innerText || '').trim();
+}
+
 function attachColumnFilters(tableId) {
   const table = document.getElementById(tableId);
   if (!table) return;
@@ -3032,7 +3170,7 @@ function openColFilter(tableId, colIdx, anchor) {
   const table = document.getElementById(tableId);
   const tbody = table.querySelector('tbody');
   const rows = Array.from(tbody.querySelectorAll('tr'));
-  const allValues = [...new Set(rows.map(r => (r.cells[colIdx]?.innerText || '').trim()))].sort();
+  const allValues = [...new Set(rows.map(r => cellText(r, colIdx)))].sort();
   const selected = colFilters[tableId]?.[colIdx] || new Set(allValues);
 
   const pop = document.createElement('div');
@@ -3099,7 +3237,7 @@ function applyAllColFilters(tableId) {
     if (row.closest('.list-detail-row')) return; // skip detail rows and their inner rows
     let visible = true;
     for (const [colIdx, selected] of Object.entries(filters)) {
-      const val = (row.cells[colIdx]?.innerText || '').trim();
+      const val = cellText(row, colIdx);
       if (!selected.has(val)) { visible = false; break; }
     }
     row.style.display = visible ? '' : 'none';
@@ -3132,10 +3270,32 @@ function initCharts() {
 }
 
 function renderListCharts() {
-  initListCL2LChart();
+  initListCTRChart();
   initListCPLChart();
   initListLeadsChart();
 }
+
+// Drill down from a list chart bar to its row in the Master Performance Matrix
+function drillToList(listName) {
+  const table = document.getElementById('listsTable');
+  if (!table) return;
+  const row = Array.from(table.querySelectorAll('tr.list-summary-row')).find(r => r.dataset.list === listName);
+  if (!row) return;
+  const lid = row.dataset.lid;
+  const detail = lid ? document.getElementById(lid) : null;
+  if (detail && detail.style.display === 'none') toggleListDetail(lid);
+  row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+const barDrillOptions = (sorted) => ({
+  onClick: (evt, elements) => {
+    if (!elements.length) return;
+    drillToList(sorted[elements[0].index].list);
+  },
+  onHover: (evt, elements) => {
+    evt.native.target.style.cursor = elements.length ? 'pointer' : 'default';
+  }
+});
 
 function initCostDonutChart() {
   const ctx = document.getElementById('chartCostDonut')?.getContext('2d');
@@ -3380,22 +3540,23 @@ function initTopListsChart() {
   }
 }
 
-function initListCL2LChart() {
-  const ctx = document.getElementById('chartListCL2L')?.getContext('2d');
+function initListCTRChart() {
+  const ctx = document.getElementById('chartListCTR')?.getContext('2d');
   if (!ctx) return;
-  if (chartInstances['listCL2L']) chartInstances['listCL2L'].destroy();
-  const sorted = filteredLists.sort((a,b) => b.click_to_lead - a.click_to_lead).slice(0, 10);
-  chartInstances['listCL2L'] = new Chart(ctx, {
+  if (chartInstances['listCTR']) chartInstances['listCTR'].destroy();
+  const sorted = [...filteredLists].sort((a,b) => b.ctr - a.ctr).slice(0, 10);
+  chartInstances['listCTR'] = new Chart(ctx, {
     type: 'bar',
     data: {
       labels: sorted.map(l => l.list),
-      datasets: [{label: 'Cl→Lead %', data: sorted.map(l => (l.click_to_lead*100).toFixed(1)), backgroundColor: '#10B981'}]
+      datasets: [{label: 'Sent→Click %', data: sorted.map(l => (l.ctr*100).toFixed(2)), backgroundColor: '#10B981'}]
     },
     options: {
       indexAxis: 'y',
       responsive: true, maintainAspectRatio: false,
       plugins: {legend: {display: false}},
-      scales: {x: {beginAtZero: true}}
+      scales: {x: {beginAtZero: true}},
+      ...barDrillOptions(sorted)
     }
   });
 }
@@ -3404,7 +3565,7 @@ function initListCPLChart() {
   const ctx = document.getElementById('chartListCPL')?.getContext('2d');
   if (!ctx) return;
   if (chartInstances['listCPL']) chartInstances['listCPL'].destroy();
-  const sorted = filteredLists.filter(l => l.cost_per_lead > 0).sort((a,b) => a.cost_per_lead - b.cost_per_lead).slice(0, 10);
+  const sorted = [...filteredLists].filter(l => l.cost_per_lead > 0).sort((a,b) => a.cost_per_lead - b.cost_per_lead).slice(0, 10);
   chartInstances['listCPL'] = new Chart(ctx, {
     type: 'bar',
     data: {
@@ -3415,7 +3576,8 @@ function initListCPLChart() {
       indexAxis: 'y',
       responsive: true, maintainAspectRatio: false,
       plugins: {legend: {display: false}},
-      scales: {x: {beginAtZero: true}}
+      scales: {x: {beginAtZero: true}},
+      ...barDrillOptions(sorted)
     }
   });
 }
@@ -3424,14 +3586,18 @@ function initListLeadsChart() {
   const ctx = document.getElementById('chartListLeads')?.getContext('2d');
   if (!ctx) return;
   if (chartInstances['listLeads']) chartInstances['listLeads'].destroy();
-  const sorted = filteredLists.sort((a,b) => b.leads - a.leads).slice(0, 15);
+  const sorted = [...filteredLists].sort((a,b) => b.leads - a.leads).slice(0, 15);
   chartInstances['listLeads'] = new Chart(ctx, {
     type: 'bar',
     data: {
       labels: sorted.map(l => l.list),
       datasets: [{label: 'Leads', data: sorted.map(l => l.leads), backgroundColor: '#8B5CF6'}]
     },
-    options: {responsive: true, maintainAspectRatio: false, plugins: {legend: {display: false}}, scales: {y: {beginAtZero: true}}}
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {legend: {display: false}}, scales: {y: {beginAtZero: true}},
+      ...barDrillOptions(sorted)
+    }
   });
 }
 
@@ -3478,8 +3644,8 @@ function sortTable(tableId, col, direction) {
     // Sort only summary rows, re-append each with its paired detail row
     const summaryRows = Array.from(tbody.querySelectorAll('tr.list-summary-row'));
     summaryRows.sort((a, b) => {
-      const aVal = a.cells[col]?.innerText || '';
-      const bVal = b.cells[col]?.innerText || '';
+      const aVal = cellText(a, col);
+      const bVal = cellText(b, col);
       const aNum = parseFloat(aVal.replace(/[^0-9.-]/g, ''));
       const bNum = parseFloat(bVal.replace(/[^0-9.-]/g, ''));
       const isNum = !isNaN(aNum) && !isNaN(bNum);
@@ -3681,8 +3847,15 @@ function parseCSVData(text) {
       const lastDot = v.lastIndexOf('.');
       const lastComma = v.lastIndexOf(',');
       if (lastComma > lastDot) {
-        // European: dot = thousands sep, comma = decimal → remove dots, swap comma→dot
-        v = v.replace(/\./g, '').replace(',', '.');
+        if (lastDot === -1 && /^-?\d{1,3}(,\d{3})+$/.test(v)) {
+          // No decimal point anywhere and the value is a valid comma-grouped
+          // integer (e.g. "3,722") — American thousands separator, not a
+          // European decimal ("3,722" would otherwise become 3.722).
+          v = v.replace(/,/g, '');
+        } else {
+          // European: dot = thousands sep, comma = decimal → remove dots, swap comma→dot
+          v = v.replace(/\./g, '').replace(',', '.');
+        }
       } else {
         // American: comma = thousands sep → remove commas
         v = v.replace(/,/g, '');
