@@ -383,7 +383,7 @@ tbody tr:hover{background:#F8FAFC}
   <div class="topbar">
     <div class="topbar-left">
       <h1>SMS Campaign Analytics</h1>
-      <p>Track performance, optimize ROI, and plan future sends</p>
+      <p>Track performance, plan sends, and decide which lists to reuse</p>
     </div>
     <div class="topbar-right">
       <div style="position:relative">
@@ -449,6 +449,8 @@ tbody tr:hover{background:#F8FAFC}
         <span id="dbLabel" style="font-size:11px;font-weight:600;color:#64748B;white-space:nowrap">Connecting…</span>
       </div>
       <button id="seedBtn" onclick="resyncDatabase()" title="Replace every campaign record in the database with the dashboard's current data — use this after the underlying campaign data has been updated" style="background:#7C3AED;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">Resync Data</button>
+      <button onclick="document.getElementById('globalCsvInput').click()" title="Import a campaign CSV from anywhere in the dashboard — no need to switch to the Dashboard tab" style="background:#0EA5E9;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">📁 Upload CSV</button>
+      <input id="globalCsvInput" type="file" accept=".csv" style="display:none" onchange="handleFileUpload(event)">
     </div>
   </div>
 
@@ -473,7 +475,6 @@ tbody tr:hover{background:#F8FAFC}
       <div class="kpi-card" id="kpi-card-cost">
         <div class="kpi-label" title="Sum of all campaign costs (SMS sending costs)">Total Spend</div>
         <div class="kpi-value" id="kpi-cost">€0</div>
-        <div class="kpi-sub" id="kpi-roi">ROI: +0%</div>
       </div>
       <div class="kpi-card" id="kpi-card-ecpa-ftd">
         <div class="kpi-label" title="Effective CPA per Sale (FTD) = Total Spend ÷ Total Sales">ECPA (FTD)</div>
@@ -565,119 +566,6 @@ tbody tr:hover{background:#F8FAFC}
       </div>
     </div>
 
-
-    <!-- BRAND VERDICTS (COLLAPSIBLE) -->
-    <div class="collapsible-section">
-      <div class="collapsible-header" onclick="toggleCollapsible(this)">
-        <span>🏷️ Brand Performance Summary</span>
-        <span style="font-size:12px">▼</span>
-      </div>
-      <div class="collapsible-content">
-        <div style="overflow-x:auto"><table style="font-size:13px">
-  <thead><tr><th>Brand</th><th>Campaigns</th><th>CTR</th><th>Cl→Lead</th><th>Lead→Sale</th><th>Leads</th><th>Sales</th><th>ROI</th><th>Verdict</th></tr></thead>
-  <tbody><tr>
-      <td style="font-weight:600">FortunePlay</td>
-      <td class="num">15</td>
-      <td class="num" style="font-weight:700;color:#16A34A">3.43%</td>
-      <td class="num">10.5%</td>
-      <td class="num">9.9%</td>
-      <td class="num" style="font-weight:600">223</td>
-      <td class="num">22</td>
-      <td class="num" style="color:#DC2626;font-weight:600">-82.9%</td>
-      <td style="font-size:11px">🟢 Top performer — high CTR + good conversion</td>
-    </tr><tr>
-      <td style="font-weight:600">PlayMojo</td>
-      <td class="num">21</td>
-      <td class="num" style="font-weight:700;color:#16A34A">3.25%</td>
-      <td class="num">10.9%</td>
-      <td class="num">5.3%</td>
-      <td class="num" style="font-weight:600">284</td>
-      <td class="num">15</td>
-      <td class="num" style="color:#DC2626;font-weight:600">-91.5%</td>
-      <td style="font-size:11px">🟢 Strong traffic + leads — optimize retention</td>
-    </tr><tr>
-      <td style="font-weight:600">LuckyVibe</td>
-      <td class="num">33</td>
-      <td class="num" style="font-weight:700;color:#16A34A">2.42%</td>
-      <td class="num">13.4%</td>
-      <td class="num">7.9%</td>
-      <td class="num" style="font-weight:600">279</td>
-      <td class="num">22</td>
-      <td class="num" style="color:#DC2626;font-weight:600">-89.6%</td>
-      <td style="font-size:11px">🔵 Average CTR but good lead gen</td>
-    </tr><tr>
-      <td style="font-weight:600">SpinsUp</td>
-      <td class="num">34</td>
-      <td class="num" style="font-weight:700;color:#16A34A">2.42%</td>
-      <td class="num">10.2%</td>
-      <td class="num">9.7%</td>
-      <td class="num" style="font-weight:600">237</td>
-      <td class="num">23</td>
-      <td class="num" style="color:#DC2626;font-weight:600">-90.2%</td>
-      <td style="font-size:11px">🔵 Decent — converts leads well</td>
-    </tr><tr>
-      <td style="font-weight:600">Rooster</td>
-      <td class="num">20</td>
-      <td class="num" style="font-weight:700;color:#16A34A">2.11%</td>
-      <td class="num">10.3%</td>
-      <td class="num">6.2%</td>
-      <td class="num" style="font-weight:600">161</td>
-      <td class="num">10</td>
-      <td class="num" style="color:#DC2626;font-weight:600">-93.4%</td>
-      <td style="font-size:11px">🔵 Average CTR but good lead gen</td>
-    </tr><tr>
-      <td style="font-weight:600">Rooster.bet</td>
-      <td class="num">1</td>
-      <td class="num" style="font-weight:700;color:#DC2626">2.02%</td>
-      <td class="num">13.6%</td>
-      <td class="num">7.1%</td>
-      <td class="num" style="font-weight:600">14</td>
-      <td class="num">1</td>
-      <td class="num" style="color:#DC2626;font-weight:600">-91.3%</td>
-      <td style="font-size:11px">🔵 Average CTR but good lead gen</td>
-    </tr><tr>
-      <td style="font-weight:600">Lucky7Even</td>
-      <td class="num">12</td>
-      <td class="num" style="font-weight:700;color:#DC2626">1.97%</td>
-      <td class="num">17.8%</td>
-      <td class="num">6.2%</td>
-      <td class="num" style="font-weight:600">145</td>
-      <td class="num">9</td>
-      <td class="num" style="color:#DC2626;font-weight:600">-90.1%</td>
-      <td style="font-size:11px">🔴 Below average — review brand and SMS copy fit</td>
-    </tr><tr>
-      <td style="font-weight:600">SpinJo</td>
-      <td class="num">29</td>
-      <td class="num" style="font-weight:700;color:#DC2626">1.78%</td>
-      <td class="num">14.0%</td>
-      <td class="num">4.7%</td>
-      <td class="num" style="font-weight:600">275</td>
-      <td class="num">13</td>
-      <td class="num" style="color:#DC2626;font-weight:600">-95.3%</td>
-      <td style="font-size:11px">🟡 Low CTR but decent sales volume</td>
-    </tr><tr>
-      <td style="font-weight:600">RocketSpin</td>
-      <td class="num">24</td>
-      <td class="num" style="font-weight:700;color:#DC2626">1.55%</td>
-      <td class="num">13.8%</td>
-      <td class="num">10.4%</td>
-      <td class="num" style="font-weight:600">163</td>
-      <td class="num">17</td>
-      <td class="num" style="color:#DC2626;font-weight:600">-89.5%</td>
-      <td style="font-size:11px">🟡 Low CTR but decent sales volume</td>
-    </tr><tr>
-      <td style="font-weight:600">Rollero</td>
-      <td class="num">9</td>
-      <td class="num" style="font-weight:700;color:#DC2626">1.47%</td>
-      <td class="num">15.6%</td>
-      <td class="num">5.5%</td>
-      <td class="num" style="font-weight:600">127</td>
-      <td class="num">7</td>
-      <td class="num" style="color:#DC2626;font-weight:600">-95.3%</td>
-      <td style="font-size:11px">🔴 Below average — review brand and SMS copy fit</td>
-    </tr></tbody></table></div>
-      </div>
-    </div>
   </div>
 
   <!-- COUNTRIES TAB -->
@@ -708,7 +596,6 @@ tbody tr:hover{background:#F8FAFC}
           <th onclick="sortTable('countriesTable', 7)" class="num" title="Total SMS sending cost">Spend</th>
           <th onclick="sortTable('countriesTable', 8)" class="num" title="Cost per Acquisition (Sale) = Spend ÷ Sales">CPA</th>
           <th onclick="sortTable('countriesTable', 9)" class="num" title="Effective CPA per Lead = Spend ÷ Leads">eCPA</th>
-          <th onclick="sortTable('countriesTable', 10)" class="num" title="Return on Investment = (Revenue - Spend) ÷ Spend × 100. Revenue = Sales × €20">ROI</th>
         </tr></thead>
         <tbody id="countriesTable-body"></tbody>
       </table>
@@ -743,7 +630,6 @@ tbody tr:hover{background:#F8FAFC}
           <th onclick="sortTable('brandsTable', 7)" class="num" title="Total SMS sending cost">Spend</th>
           <th onclick="sortTable('brandsTable', 8)" class="num" title="Cost per Acquisition (Sale) = Spend ÷ Sales">CPA</th>
           <th onclick="sortTable('brandsTable', 9)" class="num" title="Effective CPA per Lead = Spend ÷ Leads">eCPA</th>
-          <th onclick="sortTable('brandsTable', 10)" class="num" title="Return on Investment = (Revenue - Spend) ÷ Spend × 100. Revenue = Sales × €20">ROI</th>
         </tr></thead>
         <tbody id="brandsTable-body"></tbody>
       </table>
@@ -760,7 +646,7 @@ tbody tr:hover{background:#F8FAFC}
     <div class="card" style="background:#EFF6FF;border-color:#BFDBFE;margin-bottom:20px">
       <div style="font-weight:600;color:#0C4A6E;margin-bottom:8px">📊 Scoring Explanation</div>
       <div style="font-size:12px;color:#0F172A;line-height:1.6">
-        <strong>Use Again?</strong> Scores are based on: ROI trend, median CTR comparison, lead generation quality, conversion metrics, and lead volume.
+        <strong>Use Again?</strong> AI-suggested by default (labelled "(AI)") based on ECPA (FTD/Reg), sales volume, lead volume, and CTR — override it manually anytime (labelled "(Manual)").
         <strong>CPA Color Codes:</strong> Green (€ &lt; 15) = excellent, Yellow (€ 15-30) = good, Red (€ ≥ 30) = investigate.
       </div>
     </div>
@@ -805,10 +691,9 @@ tbody tr:hover{background:#F8FAFC}
           <th onclick="sortTable('listsTable', 13)" class="num" title="ECPA (Reg) = Total Spend ÷ Total Leads — matches main dashboard">ECPA (Reg)</th>
           <th onclick="sortTable('listsTable', 14)" title="Date of most recent campaign using this combination">Last Used</th>
           <th onclick="sortTable('listsTable', 15)" title="Send End Date of the most recent campaign — from the CSV's Send End Date column">Send End Date</th>
-          <th onclick="sortTable('listsTable', 16)" class="num" title="Maximum number of send cycles (laps)">Laps</th>
-          <th onclick="sortTable('listsTable', 17)" title="Yes = sales with ECPA (FTD) ≤ €280, or proven (>5 sends, ECPA Reg <€280) | Maybe = sales but ECPA >€280, or leads >2 | No = no results. Select Yes/Maybe/No to manually override, or 'auto' to use the computed score.">Use Again?</th>
-          <th onclick="sortTable('listsTable', 18)" title="Specific reasons why this list may not be worth reusing — editable">Reasons Not to Use</th>
-          <th onclick="sortTable('listsTable', 19)" title="Date this Use Again decision was made or last reviewed">Decision Date</th>
+          <th onclick="sortTable('listsTable', 16)" title="Yes = sales with ECPA (FTD) ≤ €280, or proven (>5 sends, ECPA Reg <€280) | Maybe = sales but ECPA >€280, or leads >2 | No = no results. Select Yes/Maybe/No to manually override, or 'auto' to use the computed score.">Use Again?</th>
+          <th onclick="sortTable('listsTable', 17)" title="Specific reasons why this list may not be worth reusing — editable">Reasons Not to Use</th>
+          <th onclick="sortTable('listsTable', 18)" title="Date this Use Again decision was made or last reviewed">Decision Date</th>
         </tr></thead>
         <tbody id="listsTable-body"></tbody>
       </table>
@@ -845,10 +730,9 @@ tbody tr:hover{background:#F8FAFC}
           <th onclick="sortTable('clickerListsTable', 13)" class="num" title="ECPA (Reg) = Total Spend ÷ Total Leads — matches main dashboard">ECPA (Reg)</th>
           <th onclick="sortTable('clickerListsTable', 14)" title="Date of most recent campaign using this combination">Last Used</th>
           <th onclick="sortTable('clickerListsTable', 15)" title="Send End Date of the most recent campaign — from the CSV's Send End Date column">Send End Date</th>
-          <th onclick="sortTable('clickerListsTable', 16)" class="num" title="Maximum number of send cycles (laps)">Laps</th>
-          <th onclick="sortTable('clickerListsTable', 17)" title="Yes = sales with ECPA (FTD) ≤ €280, or proven (>5 sends, ECPA Reg <€280) | Maybe = sales but ECPA >€280, or leads >2 | No = no results. Select Yes/Maybe/No to manually override, or 'auto' to use the computed score.">Use Again?</th>
-          <th onclick="sortTable('clickerListsTable', 18)" title="Specific reasons why this list may not be worth reusing — editable">Reasons Not to Use</th>
-          <th onclick="sortTable('clickerListsTable', 19)" title="Date this Use Again decision was made or last reviewed">Decision Date</th>
+          <th onclick="sortTable('clickerListsTable', 16)" title="Yes = sales with ECPA (FTD) ≤ €280, or proven (>5 sends, ECPA Reg <€280) | Maybe = sales but ECPA >€280, or leads >2 | No = no results. Select Yes/Maybe/No to manually override, or 'auto' to use the computed score.">Use Again?</th>
+          <th onclick="sortTable('clickerListsTable', 17)" title="Specific reasons why this list may not be worth reusing — editable">Reasons Not to Use</th>
+          <th onclick="sortTable('clickerListsTable', 18)" title="Date this Use Again decision was made or last reviewed">Decision Date</th>
         </tr></thead>
         <tbody id="clickerListsTable-body"></tbody>
       </table>
@@ -1441,8 +1325,7 @@ tbody tr:hover{background:#F8FAFC}
           <th onclick="sortTable('campaignsTable', 11)" class="num" title="SMS sending cost for this campaign">Cost</th>
           <th onclick="sortTable('campaignsTable', 12)" class="num" title="Cost per Acquisition (Sale) = Cost ÷ Sales">CPA</th>
           <th onclick="sortTable('campaignsTable', 13)" class="num" title="Effective CPA per Lead = Cost ÷ Leads">eCPA</th>
-          <th onclick="sortTable('campaignsTable', 14)" class="num" title="Return on Investment = (Revenue - Spend) ÷ Spend × 100">ROI</th>
-          <th onclick="sortTable('campaignsTable', 15)" title="Campaign creation date">Date</th>
+          <th onclick="sortTable('campaignsTable', 14)" title="Campaign creation date">Date</th>
         </tr></thead>
         <tbody id="campaignsTable-body"></tbody>
       </table>
@@ -1775,7 +1658,7 @@ async function initSupabase() {
       campaigns.length = 0;
       const n = v => Number(v) || 0; // ensure numeric — Supabase may return strings
       dbCamps.forEach(r => campaigns.push({
-        id: r.id, name: r.name, country: r.country || '', brand: r.brand || '',
+        id: r.id, name: r.name, country: r.country || '', brand: normalizeBrand(r.brand),
         type: r.type || 'Fresh', list: r.list || '', laps: n(r.laps),
         sent: n(r.sent), clicks: n(r.clicks), leads: n(r.leads),
         sales: n(r.sales), cost: n(r.cost), revenue: n(r.revenue),
@@ -2004,10 +1887,10 @@ function refreshListRows(list) {
     const sel = row.querySelector('.ua-select');
     if (sel) {
       sel.innerHTML = `
-        <option value="" ${!combo.isManual ? 'selected' : ''}>${combo.autoReuse || 'No'} (Suggested)</option>
-        <option value="Yes" ${combo.isManual && combo.reuse === 'Yes' ? 'selected' : ''}>Yes</option>
-        <option value="Maybe" ${combo.isManual && combo.reuse === 'Maybe' ? 'selected' : ''}>Maybe</option>
-        <option value="No" ${combo.isManual && combo.reuse === 'No' ? 'selected' : ''}>No</option>
+        <option value="" ${!combo.isManual ? 'selected' : ''}>${combo.autoReuse || 'No'} (AI)</option>
+        <option value="Yes" ${combo.isManual && combo.reuse === 'Yes' ? 'selected' : ''}>Yes (Manual)</option>
+        <option value="Maybe" ${combo.isManual && combo.reuse === 'Maybe' ? 'selected' : ''}>Maybe (Manual)</option>
+        <option value="No" ${combo.isManual && combo.reuse === 'No' ? 'selected' : ''}>No (Manual)</option>
       `;
       sel.style.color = combo.reuse === 'Yes' ? '#16A34A' : combo.reuse === 'Maybe' ? '#F59E0B' : '#DC2626';
     }
@@ -2586,8 +2469,6 @@ function updateKPIs() {
   const total_sales = filteredCampaigns.reduce((s,c) => s + (Number(c.sales)||0), 0);
   const total_leads = filteredCampaigns.reduce((s,c) => s + (Number(c.leads)||0), 0);
   const total_cost  = filteredCampaigns.reduce((s,c) => s + (Number(c.cost)||0), 0);
-  const total_revenue = total_sales * 20;
-  const roi = total_cost > 0 ? (total_revenue - total_cost) / total_cost : 0;
   const ecpa_reg = total_leads > 0 ? total_cost / total_leads : 0;
   const ecpa_ftd = total_sales > 0 ? total_cost / total_sales : 0;
 
@@ -2605,9 +2486,6 @@ function updateKPIs() {
 
   document.getElementById('kpi-cost').innerText = '€' + total_cost.toLocaleString(undefined, {maximumFractionDigits:0});
   document.getElementById('kpi-cost').title = 'Total Spend: €' + total_cost.toFixed(2) + ' across ' + fmtN(total_camps) + ' campaigns. Avg €' + (total_camps > 0 ? (total_cost/total_camps).toFixed(2) : '0') + '/campaign';
-
-  document.getElementById('kpi-roi').innerText = 'ROI: ' + (roi >= 0 ? '+' : '') + (roi*100).toFixed(0) + '%';
-  document.getElementById('kpi-roi').title = 'ROI = (revenue - cost) / cost = (€' + fmtN(total_revenue) + ' - €' + fmtN(Math.round(total_cost)) + ') / €' + fmtN(Math.round(total_cost)) + ' = ' + (roi*100).toFixed(1) + '%. Revenue = ' + total_sales + ' sales × €20';
 
   document.getElementById('kpi-ecpa-ftd').innerText = '€' + ecpa_ftd.toFixed(2);
   document.getElementById('kpi-ecpa-ftd').title = 'ECPA (FTD) = Total Spend ÷ Total Sales = €' + fmtN(Math.round(total_cost)) + ' ÷ ' + total_sales + ' = €' + ecpa_ftd.toFixed(2);
@@ -3002,9 +2880,8 @@ function renderCountriesTable() {
     <td class="num" title="Total campaign cost">${fmtC(c.cost)}</td>
     <td class="num" title="cost / sales = €${c.cost.toFixed(2)} / ${c.sales}">${fmtC2(c.cpa)}</td>
     <td class="num" title="cost / leads = €${c.cost.toFixed(2)} / ${c.leads}">${fmtC2(c.ecpa)}</td>
-    <td class="num" style="color:${c.roi >= 0 ? '#16A34A' : '#DC2626'}" title="ROI = (revenue - cost) / cost = (€${(c.sales*20).toFixed(0)} - €${c.cost.toFixed(0)}) / €${c.cost.toFixed(0)} = ${(c.roi*100).toFixed(1)}%">${(c.roi*100).toFixed(1)}%</td>
   </tr>`).join('');
-  initColToggle('countriesTable', ['Country', 'Campaigns', 'Sent', 'Clicks', 'CTR', 'Leads', 'Sales', 'Spend', 'CPA', 'eCPA', 'ROI']);
+  initColToggle('countriesTable', ['Country', 'Campaigns', 'Sent', 'Clicks', 'CTR', 'Leads', 'Sales', 'Spend', 'CPA', 'eCPA']);
   attachColumnFilters('countriesTable');
 }
 
@@ -3021,13 +2898,12 @@ function renderBrandsTable() {
     <td class="num" title="Total campaign cost">${fmtC(b.cost)}</td>
     <td class="num" title="cost / sales = €${b.cost.toFixed(2)} / ${b.sales}">${fmtC2(b.cpa)}</td>
     <td class="num" title="cost / leads = €${b.cost.toFixed(2)} / ${b.leads}">${fmtC2(b.ecpa)}</td>
-    <td class="num" style="color:${b.roi >= 0 ? '#16A34A' : '#DC2626'}" title="ROI = (revenue - cost) / cost = (€${(b.sales*20).toFixed(0)} - €${b.cost.toFixed(0)}) / €${b.cost.toFixed(0)} = ${(b.roi*100).toFixed(1)}%">${(b.roi*100).toFixed(1)}%</td>
   </tr>`).join('');
-  initColToggle('brandsTable', ['Brand', 'Campaigns', 'Sent', 'Clicks', 'CTR', 'Leads', 'Sales', 'Spend', 'CPA', 'eCPA', 'ROI']);
+  initColToggle('brandsTable', ['Brand', 'Campaigns', 'Sent', 'Clicks', 'CTR', 'Leads', 'Sales', 'Spend', 'CPA', 'eCPA']);
   attachColumnFilters('brandsTable');
 }
 
-const LIST_PLANNER_COLS = 20; // total columns in Master List Planner / Clicker Lists tables
+const LIST_PLANNER_COLS = 19; // total columns in Master List Planner / Clicker Lists tables
 
 function renderListsTable() {
   renderListPlannerTable('listsTable', filteredCombosMain, 'list');
@@ -3075,7 +2951,6 @@ function renderListPlannerTable(tableId, rows, idPrefix) {
         <td class="num" title="SMS send cost">${fmtC(c.cost)}</td>
         <td class="num" style="color:${c_ecpa_ftd===0?'#94A3B8':c_ecpa_ftd<100?'#16A34A':c_ecpa_ftd<215?'#F59E0B':'#DC2626'};font-weight:600" title="ECPA (FTD) = €${c.cost.toFixed(2)} ÷ ${c.sales} = ${c_ecpa_ftd>0?'€'+c_ecpa_ftd.toFixed(2):'no sales'}">${c_ecpa_ftd>0?fmtC2(c_ecpa_ftd):'—'}</td>
         <td class="num" style="color:${c_ecpa_reg===0?'#94A3B8':c_ecpa_reg<20?'#16A34A':c_ecpa_reg<50?'#F59E0B':'#DC2626'};font-weight:600" title="ECPA (Reg) = €${c.cost.toFixed(2)} ÷ ${c.leads} = ${c_ecpa_reg>0?'€'+c_ecpa_reg.toFixed(2):'no leads'}">${c_ecpa_reg>0?fmtC2(c_ecpa_reg):'—'}</td>
-        <td class="num" title="Send laps for this campaign">${c.laps || 0}</td>
       </tr>`;
     }).join('');
 
@@ -3101,13 +2976,12 @@ function renderListPlannerTable(tableId, rows, idPrefix) {
       <td class="num" style="color:${ecpa_reg===0?'#94A3B8':ecpa_reg<20?'#16A34A':ecpa_reg<50?'#F59E0B':'#DC2626'};font-weight:600" title="ECPA (Reg) = €${l.cost.toFixed(2)} ÷ ${l.leads} = ${ecpa_reg>0?'€'+ecpa_reg.toFixed(2):'no leads'}">${ecpa_reg>0?fmtC2(ecpa_reg):'—'}</td>
       <td style="font-size:11px">${l.last_used || '—'}</td>
       <td style="font-size:11px">${l.last_send_end || '—'}</td>
-      <td class="num">${l.laps}</td>
       <td style="white-space:nowrap">
-        <select class="ua-select" data-list="${escAttr(l.list)}" onchange="onUseAgainChange(this)" title="Manually override, or select 'auto' to use the computed score" style="font-weight:600;color:${l.reuse==='Yes'?'#16A34A':l.reuse==='Maybe'?'#F59E0B':'#DC2626'};border:1px solid #E2E8F0;border-radius:4px;padding:2px 4px;font-size:11px;background:#fff;cursor:pointer">
-          <option value="" ${!l.isManual?'selected':''}>${l.autoReuse || 'No'} (Suggested)</option>
-          <option value="Yes" ${l.isManual && l.reuse==='Yes'?'selected':''}>Yes</option>
-          <option value="Maybe" ${l.isManual && l.reuse==='Maybe'?'selected':''}>Maybe</option>
-          <option value="No" ${l.isManual && l.reuse==='No'?'selected':''}>No</option>
+        <select class="ua-select" data-list="${escAttr(l.list)}" onchange="onUseAgainChange(this)" title="AI-suggested unless you manually override it below" style="font-weight:600;color:${l.reuse==='Yes'?'#16A34A':l.reuse==='Maybe'?'#F59E0B':'#DC2626'};border:1px solid #E2E8F0;border-radius:4px;padding:2px 4px;font-size:11px;background:#fff;cursor:pointer">
+          <option value="" ${!l.isManual?'selected':''}>${l.autoReuse || 'No'} (AI)</option>
+          <option value="Yes" ${l.isManual && l.reuse==='Yes'?'selected':''}>Yes (Manual)</option>
+          <option value="Maybe" ${l.isManual && l.reuse==='Maybe'?'selected':''}>Maybe (Manual)</option>
+          <option value="No" ${l.isManual && l.reuse==='No'?'selected':''}>No (Manual)</option>
         </select>
         <button data-list="${escAttr(l.list)}" onclick="viewListHistory(this.dataset.list)" title="View decision history" style="border:none;background:transparent;cursor:pointer;color:#94A3B8;font-size:11px;vertical-align:middle;padding:0 2px">🕒</button>
       </td>
@@ -3133,7 +3007,6 @@ function renderListPlannerTable(tableId, rows, idPrefix) {
               <th class="num">Leads</th><th class="num">Cl→Lead</th>
               <th class="num">Sales</th><th class="num">L→Sale</th>
               <th class="num">Cost</th><th class="num">ECPA (FTD)</th><th class="num">ECPA (Reg)</th>
-              <th class="num">Laps</th>
             </tr></thead>
             <tbody>${campRows}</tbody>
           </table>
@@ -3145,7 +3018,7 @@ function renderListPlannerTable(tableId, rows, idPrefix) {
     return summaryRow + detailRow;
   }).join('');
 
-  const cols = ['List', 'Brand', 'Country', 'Campaigns', 'Sent', 'Clicks', 'CTR', 'Leads', 'Cl→Lead', 'Sales', 'L→Sale', 'Cost', 'ECPA (FTD)', 'ECPA (Reg)', 'Last Used', 'Send End Date', 'Laps', 'Use Again?', 'Reasons Not to Use', 'Decision Date'];
+  const cols = ['List', 'Brand', 'Country', 'Campaigns', 'Sent', 'Clicks', 'CTR', 'Leads', 'Cl→Lead', 'Sales', 'L→Sale', 'Cost', 'ECPA (FTD)', 'ECPA (Reg)', 'Last Used', 'Send End Date', 'Use Again?', 'Reasons Not to Use', 'Decision Date'];
   initColToggle(tableId, cols);
   attachColumnFilters(tableId);
 }
@@ -3164,7 +3037,12 @@ function renderCampaignsTable() {
   tbody.innerHTML = filteredCampaigns.map(c => `<tr>
     <td class="num">${fmtN(c.id)}</td>
     <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${c.name}">${c.name}</td>
-    <td>${c.brand}</td>
+    <td title="${brandFullName(c.brand) || 'No brand set'}">
+      <select onchange="updateCampaignBrand(${c.id}, this.value)" style="font-size:12px;border:1px solid ${c.brand ? 'transparent' : '#DC2626'};background:transparent;font-family:inherit;cursor:pointer">
+        <option value="" ${!c.brand ? 'selected' : ''}>—</option>
+        ${ALL_KNOWN_BRAND_CODES.map(code => `<option value="${code}" ${c.brand === code ? 'selected' : ''}>${code} — ${brandFullName(code)}</option>`).join('')}
+      </select>
+    </td>
     <td>${c.country}</td>
     <td><span style="background:#E0E7FF;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:600">${c.type}</span></td>
     <td style="font-size:11px;color:#64748B">${c.list}</td>
@@ -3176,11 +3054,28 @@ function renderCampaignsTable() {
     <td class="num" title="Total campaign cost">${fmtC(c.cost)}</td>
     <td class="num" title="cost / sales = €${c.cost.toFixed(2)} / ${c.sales}">${fmtC2(c.cpa)}</td>
     <td class="num" title="cost / leads = €${c.cost.toFixed(2)} / ${c.leads}">${fmtC2(c.ecpa)}</td>
-    <td class="num" style="color:${c.roi >= 0 ? '#16A34A' : '#DC2626'};font-weight:600" title="ROI = (revenue - cost) / cost = (€${c.revenue.toFixed(0)} - €${c.cost.toFixed(0)}) / €${c.cost.toFixed(0)} = ${(c.roi*100).toFixed(1)}%">${(c.roi*100).toFixed(1)}%</td>
     <td style="font-size:11px;color:#64748B">${c.date}</td>
   </tr>`).join('');
-  initColToggle('campaignsTable', ['ID', 'Name', 'Brand', 'Country', 'Type', 'List', 'Sent', 'Clicks', 'CTR', 'Leads', 'Sales', 'Cost', 'CPA', 'eCPA', 'ROI', 'Date']);
+  initColToggle('campaignsTable', ['ID', 'Name', 'Brand', 'Country', 'Type', 'List', 'Sent', 'Clicks', 'CTR', 'Leads', 'Sales', 'Cost', 'CPA', 'eCPA', 'Date']);
   attachColumnFilters('campaignsTable');
+}
+
+// Manual brand override — for the rare campaign where brand auto-identification
+// didn't pick up a value (or picked up the wrong one) from the CSV.
+async function updateCampaignBrand(id, value) {
+  const c = campaigns.find(c => c.id === id);
+  if (!c) return;
+  c.brand = value;
+  applyFilters();
+  if (sb) {
+    await sb.from('campaigns').upsert({
+      id: c.id, name: c.name, country: c.country, brand: c.brand, type: c.type,
+      list: c.list, laps: c.laps, sent: c.sent, clicks: c.clicks, leads: c.leads,
+      sales: c.sales, cost: c.cost, revenue: c.revenue, roi: c.roi, ctr: c.ctr,
+      cpa: c.cpa, ecpa: c.ecpa || 0, breakeven: c.breakeven, profitable: c.profitable,
+      created: c.created, date: c.date, raw_list: c.rawList || '', partner: c.partner || ''
+    }, { onConflict: 'id' });
+  }
 }
 
 // ── QUESTIONS TAB ──────────────────────────
@@ -4110,7 +4005,7 @@ function parseCSVData(text) {
     if (!name) continue;
 
     const country = get('Country');
-    const brand = get('Brand');
+    const brand = normalizeBrand(get('Brand'));
     const listName = get('List Name');
     const laps = getInt('Laps');
     const sent = getInt('Sent');
@@ -4224,6 +4119,38 @@ function parseCSVDate(v) {
     return `${iso[1]}-${iso[2]}-${iso[3]}`;
   }
   return '';
+}
+
+// Brand glossary — canonical short code plus every alias (full name, spacing/case
+// variants) seen across different CSV exports, so "SpinsUp" and "SU" always
+// resolve to the same brand instead of being tracked as two different brands.
+const BRAND_FULL_NAME = {
+  SU: 'SpinsUp', RS: 'RocketSpin', PM: 'PlayMojo', L7: 'Lucky7Even',
+  SJ: 'SpinJo', RO: 'Rollero', FP: 'FortunePlay', RB: 'Rooster.bet', LV: 'LuckyVibe'
+};
+const BRAND_ALIASES = {
+  SU: 'SU', SPINSUP: 'SU', 'SPINS UP': 'SU',
+  RS: 'RS', ROCKETSPIN: 'RS', 'ROCKET SPIN': 'RS',
+  PM: 'PM', PLAYMOJO: 'PM', 'PLAY MOJO': 'PM',
+  L7: 'L7', LUCKY7EVEN: 'L7', 'LUCKY 7 EVEN': 'L7', LUCKY7: 'L7',
+  SJ: 'SJ', SPINJO: 'SJ', 'SPIN JO': 'SJ',
+  RO: 'RO', ROLLERO: 'RO',
+  FP: 'FP', FORTUNEPLAY: 'FP', 'FORTUNE PLAY': 'FP',
+  RB: 'RB', 'ROOSTER.BET': 'RB', ROOSTERBET: 'RB', ROOSTER: 'RB',
+  LV: 'LV', LUCKYVIBE: 'LV', 'LUCKY VIBE': 'LV'
+};
+const ALL_KNOWN_BRAND_CODES = Object.keys(BRAND_FULL_NAME);
+
+// Resolves any known alias (short code, full name, odd spacing/case) to the
+// canonical short code. Unknown values pass through unchanged rather than
+// being blanked out, so nothing silently disappears.
+function normalizeBrand(raw) {
+  if (!raw) return '';
+  const key = raw.trim().toUpperCase();
+  return BRAND_ALIASES[key] || raw.trim();
+}
+function brandFullName(code) {
+  return BRAND_FULL_NAME[code] || code || '';
 }
 
 // Fixed partner colors — consistent across all charts
