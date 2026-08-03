@@ -1815,8 +1815,16 @@ async function saveCampaignBatch(camps) {
     cpa: c.cpa, ecpa: c.ecpa || 0, breakeven: c.breakeven, profitable: c.profitable,
     created: c.created, date: c.date, raw_list: c.rawList || '', partner: c.partner || ''
   }));
-  for (let i = 0; i < rows.length; i += 100) {
-    await sb.from('campaigns').upsert(rows.slice(i, i+100), { onConflict: 'id' });
+  // Smaller batches + explicit error checking: a single bad row (or a request
+  // that's too large / times out) must not silently abort the whole import
+  // partway through — surface exactly which batch failed and why.
+  const BATCH = 50;
+  for (let i = 0; i < rows.length; i += BATCH) {
+    const batch = rows.slice(i, i + BATCH);
+    const { error } = await sb.from('campaigns').upsert(batch, { onConflict: 'id' });
+    if (error) {
+      throw new Error(`Rows ${i + 1}-${i + batch.length} of ${rows.length} failed to save: ${error.message}`);
+    }
   }
 }
 
@@ -2081,24 +2089,36 @@ function onDecisionDateChange(input) {
 
 // Fully replaces the database's campaign records with whatever is currently
 // loaded in the dashboard (the baked-in dataset, or a CSV just uploaded).
-// A plain upsert would leave stale/orphan rows behind (e.g. old test campaigns
-// or a previous incomplete import) — deleting everything first guarantees the
-// database ends up as an exact 1-for-1 mirror of the source data, no leftovers.
+// IMPORTANT ORDER: upsert the new data FIRST, and only delete now-stale
+// leftover rows AFTER that succeeds. A previous version deleted everything
+// up front, so when saveCampaignBatch failed partway through (e.g. one bad
+// batch), the table was left with only a fraction of the data and no way
+// to recover the rest. This order means a failure here never loses data —
+// worst case some stale rows are left behind until you click Resync again.
 async function resyncDatabase() {
   if (!sb) { alert('Not connected to Supabase'); return; }
-  if (!confirm(`This will replace ALL ${campaigns.length} campaign records in the database with the dashboard's current data. Continue?`)) return;
+  if (!confirm(`This will sync all ${campaigns.length} campaigns in the dashboard to the database (adding/updating as needed, then removing anything no longer present). Continue?`)) return;
   const btn = document.getElementById('seedBtn');
   btn.disabled = true; btn.textContent = 'Resyncing…';
   try {
-    await sb.from('campaigns').delete().gte('id', 0);
     await saveCampaignBatch(campaigns);
+
+    const { data: existingRows, error: fetchErr } = await sb.from('campaigns').select('id').limit(20000);
+    if (fetchErr) throw new Error('Saved all campaigns, but could not check for stale rows: ' + fetchErr.message);
+    const newIds = new Set(campaigns.map(c => c.id));
+    const staleIds = (existingRows || []).map(r => r.id).filter(id => !newIds.has(id));
+    for (let i = 0; i < staleIds.length; i += 100) {
+      const { error: delErr } = await sb.from('campaigns').delete().in('id', staleIds.slice(i, i + 100));
+      if (delErr) throw new Error('Saved all campaigns, but failed removing stale rows: ' + delErr.message);
+    }
+
     for (let i = 0; i < contentRows.length; i++) await syncContentRow(i);
     btn.disabled = false; btn.textContent = 'Resync Data';
     setDbStatus('live', 'Live');
-    alert(`Resync complete — ${campaigns.length} campaigns are now live in the database.`);
+    alert(`Resync complete — ${campaigns.length} campaigns are live in the database` + (staleIds.length ? ` (removed ${staleIds.length} stale row(s)).` : '.'));
   } catch(e) {
     btn.disabled = false; btn.textContent = 'Retry Resync';
-    alert('Resync failed: ' + e.message);
+    alert('Resync problem: ' + e.message + '\n\nNothing already saved was deleted — click Resync Data again to retry.');
   }
 }
 
