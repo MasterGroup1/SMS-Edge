@@ -447,7 +447,7 @@ tbody tr:hover{background:#F8FAFC}
         <span id="dbDot" style="width:8px;height:8px;border-radius:50%;background:#f59e0b;flex-shrink:0;transition:background .3s"></span>
         <span id="dbLabel" style="font-size:11px;font-weight:600;color:#64748B;white-space:nowrap">Connecting…</span>
       </div>
-      <button id="seedBtn" onclick="seedDatabase()" style="display:none;background:#7C3AED;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">Seed DB</button>
+      <button id="seedBtn" onclick="resyncDatabase()" title="Replace every campaign record in the database with the dashboard's current data — use this after the underlying campaign data has been updated" style="background:#7C3AED;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">Resync Data</button>
     </div>
   </div>
 
@@ -1699,13 +1699,10 @@ async function initSupabase() {
         created: r.created || '', date: r.date || '',
         rawList: normalizeListName(r.raw_list || ''),
         // Re-derive partner from list name in case old DB rows have blank/wrong partner
-        partner: r.partner || extractPartnerJS(r.raw_list || '') || ''
+        partner: r.partner || extractPartnerJS(r.raw_list || '') || '',
+        sendingPeriod: r.sending_period || '', sendEndDate: r.send_end_date || ''
       }));
       filteredCampaigns = [...campaigns];
-    } else {
-      // DB empty — show Seed button
-      const seedBtn = document.getElementById('seedBtn');
-      if (seedBtn) seedBtn.style.display = '';
     }
     if (!contErr && dbContent && dbContent.length > 0) {
       contentRows.length = 0;
@@ -1765,7 +1762,7 @@ async function saveListDecision(list, useAgain, reason, decisionDate) {
   await sb.from('list_decision_history').insert(row);
   listDecisions[list] = row;
   recomputeAggregates();
-  renderListsTable();
+  refreshListRows(list);
 }
 
 async function clearListDecision(list) {
@@ -1774,7 +1771,37 @@ async function clearListDecision(list) {
   await sb.from('list_decision_history').insert({ list, use_again: null, reason: '', decision_date: null });
   delete listDecisions[list];
   recomputeAggregates();
-  renderListsTable();
+  refreshListRows(list);
+}
+
+// Update just the affected row(s) in place — a full renderListsTable() call would
+// rebuild the whole tbody and silently discard the user's current sort order,
+// expanded/collapsed drill-downs, search filter and column visibility toggles.
+function refreshListRows(list) {
+  const combo = filteredCombosMain.find(l => l.list === list) || filteredCombosClickers.find(l => l.list === list);
+  if (!combo) return;
+  document.querySelectorAll('tr.list-summary-row').forEach(row => {
+    if (row.dataset.list !== list) return;
+    const sel = row.querySelector('.ua-select');
+    if (sel) {
+      sel.innerHTML = `
+        <option value="" ${!combo.isManual ? 'selected' : ''}>${combo.autoReuse || 'No'} (Suggested)</option>
+        <option value="Yes" ${combo.isManual && combo.reuse === 'Yes' ? 'selected' : ''}>Yes</option>
+        <option value="Maybe" ${combo.isManual && combo.reuse === 'Maybe' ? 'selected' : ''}>Maybe</option>
+        <option value="No" ${combo.isManual && combo.reuse === 'No' ? 'selected' : ''}>No</option>
+      `;
+      sel.style.color = combo.reuse === 'Yes' ? '#16A34A' : combo.reuse === 'Maybe' ? '#F59E0B' : '#DC2626';
+    }
+    const reasonInput = row.querySelector('.reason-input');
+    if (reasonInput) {
+      reasonInput.value = combo.reason || '';
+      reasonInput.dataset.orig = combo.reason || '';
+      reasonInput.title = combo.reason || '—';
+      reasonInput.style.color = (combo.reason && combo.reason !== '—') ? '#DC2626' : '#94A3B8';
+    }
+    const dateInput = row.querySelector('.decision-date-input');
+    if (dateInput) dateInput.value = combo.decisionDate || '';
+  });
 }
 
 async function viewListHistory(list) {
@@ -1841,17 +1868,26 @@ function onDecisionDateChange(input) {
   saveListDecision(list, useAgain, reason, input.value);
 }
 
-async function seedDatabase() {
+// Fully replaces the database's campaign records with whatever is currently
+// loaded in the dashboard (the baked-in dataset, or a CSV just uploaded).
+// A plain upsert would leave stale/orphan rows behind (e.g. old test campaigns
+// or a previous incomplete import) — deleting everything first guarantees the
+// database ends up as an exact 1-for-1 mirror of the source data, no leftovers.
+async function resyncDatabase() {
   if (!sb) { alert('Not connected to Supabase'); return; }
+  if (!confirm(`This will replace ALL ${campaigns.length} campaign records in the database with the dashboard's current data. Continue?`)) return;
   const btn = document.getElementById('seedBtn');
-  btn.disabled = true; btn.textContent = 'Seeding…';
+  btn.disabled = true; btn.textContent = 'Resyncing…';
   try {
+    await sb.from('campaigns').delete().gte('id', 0);
     await saveCampaignBatch(campaigns);
     for (let i = 0; i < contentRows.length; i++) await syncContentRow(i);
-    btn.style.display = 'none';
+    btn.disabled = false; btn.textContent = 'Resync Data';
     setDbStatus('live', 'Live');
+    alert(`Resync complete — ${campaigns.length} campaigns are now live in the database.`);
   } catch(e) {
-    btn.disabled = false; btn.textContent = 'Retry Seed';
+    btn.disabled = false; btn.textContent = 'Retry Resync';
+    alert('Resync failed: ' + e.message);
   }
 }
 
@@ -2824,7 +2860,7 @@ function renderListPlannerTable(tableId, rows, idPrefix) {
       <td class="num">${l.laps}</td>
       <td style="white-space:nowrap">
         <select class="ua-select" data-list="${escAttr(l.list)}" onchange="onUseAgainChange(this)" title="Manually override, or select 'auto' to use the computed score" style="font-weight:600;color:${l.reuse==='Yes'?'#16A34A':l.reuse==='Maybe'?'#F59E0B':'#DC2626'};border:1px solid #E2E8F0;border-radius:4px;padding:2px 4px;font-size:11px;background:#fff;cursor:pointer">
-          <option value="" ${!l.isManual?'selected':''}>${l.autoReuse} (auto)</option>
+          <option value="" ${!l.isManual?'selected':''}>${l.autoReuse || 'No'} (Suggested)</option>
           <option value="Yes" ${l.isManual && l.reuse==='Yes'?'selected':''}>Yes</option>
           <option value="Maybe" ${l.isManual && l.reuse==='Maybe'?'selected':''}>Maybe</option>
           <option value="No" ${l.isManual && l.reuse==='No'?'selected':''}>No</option>
