@@ -366,6 +366,7 @@ tbody tr:hover{background:#F8FAFC}
     <div class="nav-item" data-tab="countries">🌍 Countries</div>
     <div class="nav-item" data-tab="brands">🏷️ Brands</div>
     <div class="nav-item" data-tab="lists">📋 List Performance</div>
+    <div class="nav-item" data-tab="planner">📅 Planner</div>
     <div class="nav-item" data-tab="breakeven">🎯 Break-Even Tracker</div>
     <div class="nav-item" data-tab="pricing">💰 Pricing</div>
     <div class="nav-item" data-tab="routes">🗺️ Routes</div>
@@ -850,6 +851,82 @@ tbody tr:hover{background:#F8FAFC}
           <th onclick="sortTable('clickerListsTable', 19)" title="Date this Use Again decision was made or last reviewed">Decision Date</th>
         </tr></thead>
         <tbody id="clickerListsTable-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- PLANNER TAB — schedule future sends by date/brand, with historical plans kept for reference -->
+  <div id="planner" class="page">
+    <div class="tabs">
+      <div class="tab active" data-tab="planner">Planner</div>
+    </div>
+
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-header"><div class="card-title">Schedule a Send</div></div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end">
+        <div>
+          <label style="display:block;font-size:11px;font-weight:600;color:#64748B;margin-bottom:4px">Planned Date</label>
+          <input id="plannerDateInput" type="date" style="border:1px solid #E2E8F0;border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit">
+        </div>
+        <div>
+          <label style="display:block;font-size:11px;font-weight:600;color:#64748B;margin-bottom:4px">List</label>
+          <input id="plannerListInput" type="text" list="plannerListOptions" placeholder="e.g. Roy Boy_AU_..." style="border:1px solid #E2E8F0;border-radius:6px;padding:6px 8px;font-size:12px;width:220px;font-family:inherit">
+          <datalist id="plannerListOptions"></datalist>
+        </div>
+        <div>
+          <label style="display:block;font-size:11px;font-weight:600;color:#64748B;margin-bottom:4px">Brand</label>
+          <select id="plannerBrandInput" style="border:1px solid #E2E8F0;border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit">
+            <option value="">—</option>
+          </select>
+        </div>
+        <div>
+          <label style="display:block;font-size:11px;font-weight:600;color:#64748B;margin-bottom:4px">Country</label>
+          <input id="plannerCountryInput" type="text" list="plannerCountryOptions" placeholder="e.g. Germany" style="border:1px solid #E2E8F0;border-radius:6px;padding:6px 8px;font-size:12px;width:150px;font-family:inherit">
+          <datalist id="plannerCountryOptions"></datalist>
+        </div>
+        <div style="flex:1;min-width:180px">
+          <label style="display:block;font-size:11px;font-weight:600;color:#64748B;margin-bottom:4px">Notes</label>
+          <input id="plannerNotesInput" type="text" placeholder="Optional notes..." style="border:1px solid #E2E8F0;border-radius:6px;padding:6px 8px;font-size:12px;width:100%;font-family:inherit">
+        </div>
+        <button class="q-add-btn" onclick="addPlannedSend()">+ Add to Planner</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Scheduled &amp; Historical Plans</div>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+        <div>
+          <label style="font-size:11px;font-weight:600;color:#64748B;margin-right:6px">Status</label>
+          <select id="plannerStatusFilter" onchange="onPlannerFilterChange()" style="border:1px solid #E2E8F0;border-radius:6px;padding:5px 8px;font-size:12px;font-family:inherit">
+            <option value="Upcoming">Upcoming (Planned)</option>
+            <option value="All">All (incl. history)</option>
+            <option value="Planned">Planned</option>
+            <option value="Sent">Sent</option>
+            <option value="Cancelled">Cancelled</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:600;color:#64748B;margin-right:6px">Brand</label>
+          <select id="plannerBrandFilter" onchange="onPlannerFilterChange()" style="border:1px solid #E2E8F0;border-radius:6px;padding:5px 8px;font-size:12px;font-family:inherit">
+            <option value="">All Brands</option>
+          </select>
+        </div>
+        <input type="text" id="plannerSearch" class="search" placeholder="Search planner..." onkeyup="onPlannerFilterChange()" style="margin:0;max-width:220px">
+      </div>
+      <table class="questions-table" id="plannerTable">
+        <thead><tr>
+          <th style="width:110px">Planned Date</th>
+          <th>List</th>
+          <th style="width:70px">Brand</th>
+          <th style="width:110px">Country</th>
+          <th style="width:110px">Status</th>
+          <th>Notes</th>
+          <th style="width:90px">Created</th>
+          <th style="width:50px">Action</th>
+        </tr></thead>
+        <tbody id="plannerBody"></tbody>
       </table>
     </div>
   </div>
@@ -1677,11 +1754,19 @@ async function initSupabase() {
   setDbStatus('connecting', 'Connecting…');
   try {
     sb = supabase.createClient(SB_URL, SB_KEY);
-    const [{ data: dbCamps, error: campErr }, { data: dbContent, error: contErr }, { data: dbDecisions, error: decErr }] = await Promise.all([
+    const [{ data: dbCamps, error: campErr }, { data: dbContent, error: contErr }, { data: dbDecisions, error: decErr }, { data: dbPlans, error: planErr }] = await Promise.all([
       sb.from('campaigns').select('*').order('date', { ascending: false }).limit(10000),
       sb.from('content_rows').select('*').order('sort_order'),
-      sb.from('list_decisions').select('*')
+      sb.from('list_decisions').select('*'),
+      sb.from('planned_sends').select('*').order('planned_date')
     ]);
+    if (!planErr && dbPlans) {
+      plannedSends = dbPlans.map(p => ({
+        _id: p.id, planned_date: p.planned_date || '', list: p.list || '',
+        brand: p.brand || '', country: p.country || '', status: p.status || 'Planned',
+        notes: p.notes || '', created_at: p.created_at || ''
+      }));
+    }
     if (!decErr && dbDecisions) {
       listDecisions = {};
       dbDecisions.forEach(d => { listDecisions[d.list] = d; });
@@ -1751,6 +1836,132 @@ async function syncContentRow(idx) {
 async function deleteContentRowFromDB(id) {
   if (!sb || !id) return;
   await sb.from('content_rows').delete().eq('id', id);
+}
+
+// ── PLANNER (schedule future sends by date/brand; history kept for reference) ──
+function plannerKnownLists() {
+  return [...new Set(campaigns.map(c => c.rawList || c.list).filter(Boolean))].sort();
+}
+function plannerKnownBrands() {
+  return [...new Set(campaigns.map(c => c.brand).filter(Boolean))].sort();
+}
+function plannerKnownCountries() {
+  return [...new Set(campaigns.map(c => c.country).filter(Boolean))].sort();
+}
+
+function renderPlannerTab() {
+  const listDL = document.getElementById('plannerListOptions');
+  if (listDL) listDL.innerHTML = plannerKnownLists().map(l => `<option value="${escAttr(l)}">`).join('');
+  const countryDL = document.getElementById('plannerCountryOptions');
+  if (countryDL) countryDL.innerHTML = plannerKnownCountries().map(c => `<option value="${escAttr(c)}">`).join('');
+
+  const brandSelect = document.getElementById('plannerBrandInput');
+  const brandFilter = document.getElementById('plannerBrandFilter');
+  const brands = plannerKnownBrands();
+  if (brandSelect && brandSelect.options.length <= 1) {
+    brandSelect.innerHTML = '<option value="">—</option>' + brands.map(b => `<option value="${escAttr(b)}">${b}</option>`).join('');
+  }
+  if (brandFilter && brandFilter.options.length <= 1) {
+    brandFilter.innerHTML = '<option value="">All Brands</option>' + brands.map(b => `<option value="${escAttr(b)}">${b}</option>`).join('');
+  }
+
+  if (!document.getElementById('plannerDateInput').value) {
+    document.getElementById('plannerDateInput').value = new Date().toISOString().slice(0, 10);
+  }
+
+  renderPlannerTable();
+}
+
+function onPlannerFilterChange() {
+  renderPlannerTable();
+}
+
+function renderPlannerTable() {
+  const tbody = document.getElementById('plannerBody');
+  if (!tbody) return;
+  const statusFilter = document.getElementById('plannerStatusFilter')?.value || 'Upcoming';
+  const brandFilter = document.getElementById('plannerBrandFilter')?.value || '';
+  const search = (document.getElementById('plannerSearch')?.value || '').toLowerCase();
+  const today = new Date().toISOString().slice(0, 10);
+
+  let rows = plannedSends.slice();
+  if (statusFilter === 'Upcoming') {
+    rows = rows.filter(p => p.status === 'Planned' && p.planned_date >= today);
+  } else if (statusFilter !== 'All') {
+    rows = rows.filter(p => p.status === statusFilter);
+  }
+  if (brandFilter) rows = rows.filter(p => p.brand === brandFilter);
+  if (search) {
+    rows = rows.filter(p => [p.list, p.brand, p.country, p.notes].join(' ').toLowerCase().includes(search));
+  }
+  rows.sort((a, b) => (a.planned_date || '').localeCompare(b.planned_date || ''));
+
+  tbody.innerHTML = rows.map(p => `<tr>
+    <td><input type="date" value="${p.planned_date || ''}" onchange="updatePlannedSend('${p._id}', 'planned_date', this.value)" style="border:1px solid #E2E8F0;border-radius:4px;padding:3px 5px;font-size:11px;font-family:inherit"></td>
+    <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escAttr(p.list)}">
+      <input type="text" value="${escAttr(p.list)}" onchange="updatePlannedSend('${p._id}', 'list', this.value)" style="border:1px solid transparent;background:transparent;width:100%;font-size:12px;font-family:inherit">
+    </td>
+    <td>${p.brand || '—'}</td>
+    <td>${p.country || '—'}</td>
+    <td><select onchange="updatePlannedSend('${p._id}', 'status', this.value)" style="font-size:11px;font-weight:600;color:${p.status==='Sent'?'#16A34A':p.status==='Cancelled'?'#DC2626':'#2563EB'};border:1px solid #E2E8F0;border-radius:4px;padding:3px 4px">
+      <option value="Planned" ${p.status==='Planned'?'selected':''}>Planned</option>
+      <option value="Sent" ${p.status==='Sent'?'selected':''}>Sent</option>
+      <option value="Cancelled" ${p.status==='Cancelled'?'selected':''}>Cancelled</option>
+    </select></td>
+    <td><input type="text" value="${escAttr(p.notes||'')}" placeholder="Notes..." onchange="updatePlannedSend('${p._id}', 'notes', this.value)" style="border:1px solid transparent;background:transparent;width:100%;font-size:12px;font-family:inherit"></td>
+    <td style="font-size:11px;color:#64748B">${(p.created_at||'').slice(0,10) || '—'}</td>
+    <td><button class="q-delete-btn" onclick="deletePlannedSend('${p._id}')">×</button></td>
+  </tr>`).join('');
+
+  if (rows.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:#94A3B8;padding:20px">No planned sends match this filter.</td></tr>`;
+  }
+}
+
+function addPlannedSend() {
+  const planned_date = document.getElementById('plannerDateInput').value;
+  const list = document.getElementById('plannerListInput').value.trim();
+  const brand = document.getElementById('plannerBrandInput').value;
+  const country = document.getElementById('plannerCountryInput').value.trim();
+  const notes = document.getElementById('plannerNotesInput').value.trim();
+  if (!planned_date || !list) { alert('Planned Date and List are required.'); return; }
+
+  const newPlan = {
+    _id: crypto.randomUUID(), planned_date, list, brand, country,
+    status: 'Planned', notes, created_at: new Date().toISOString()
+  };
+  plannedSends.push(newPlan);
+  document.getElementById('plannerListInput').value = '';
+  document.getElementById('plannerCountryInput').value = '';
+  document.getElementById('plannerNotesInput').value = '';
+  renderPlannerTable();
+  syncPlannedSend(newPlan._id);
+}
+
+function updatePlannedSend(id, field, value) {
+  const plan = plannedSends.find(p => p._id === id);
+  if (!plan) return;
+  plan[field] = value;
+  renderPlannerTable();
+  syncPlannedSend(id);
+}
+
+function deletePlannedSend(id) {
+  if (!confirm('Delete this planned send?')) return;
+  plannedSends = plannedSends.filter(p => p._id !== id);
+  renderPlannerTable();
+  if (sb) sb.from('planned_sends').delete().eq('id', id);
+}
+
+async function syncPlannedSend(id) {
+  if (!sb) return;
+  const p = plannedSends.find(x => x._id === id);
+  if (!p) return;
+  await sb.from('planned_sends').upsert({
+    id: p._id, planned_date: p.planned_date || null, list: p.list || '',
+    brand: p.brand || '', country: p.country || '', status: p.status || 'Planned',
+    notes: p.notes || ''
+  }, { onConflict: 'id' });
 }
 
 // ── LIST DECISIONS (manual Use Again override + audit trail) ──
@@ -2123,6 +2334,7 @@ let filteredCombos = [...combos];
 let filteredCombosMain = []; // List×Brand×Country rows for real send lists (Master List Planner) — never mixed with Clicker rows
 let filteredCombosClickers = []; // List×Brand×Country rows for Clicker/retargeting segments only
 let listDecisions = {}; // manual Use Again overrides, keyed by normalized list name — see recomputeAggregates()
+let plannedSends = []; // Planner tab: scheduled + historical sends, backed by the planned_sends table
 
 // Questions state
 let questions = [
@@ -2326,6 +2538,7 @@ function switchTab(tabName) {
   if (tabName === 'countries') renderCountriesTable();
   if (tabName === 'brands') renderBrandsTable();
   if (tabName === 'lists') { renderListsTable(); renderListCharts(); renderClickerListsTable(); }
+  if (tabName === 'planner') renderPlannerTab();
   if (tabName === 'campaigns') renderCampaignsTable();
   if (tabName === 'benchmarks') {} // benchmarks tab is pre-rendered
   if (tabName === 'pricing') { renderPricingTable(); renderPricingSummary(); }
