@@ -776,42 +776,67 @@ tbody tr:hover{background:#F8FAFC}
       </div>
     </div>
 
-    <div class="card">
-      <div class="card-header">
-        <div class="card-title">Scheduled &amp; Historical Plans</div>
-      </div>
-      <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
-        <div>
-          <label style="font-size:11px;font-weight:600;color:#64748B;margin-right:6px">Status</label>
-          <select id="plannerStatusFilter" onchange="onPlannerFilterChange()" style="border:1px solid #E2E8F0;border-radius:6px;padding:5px 8px;font-size:12px;font-family:inherit">
-            <option value="Upcoming">Upcoming (Planned)</option>
-            <option value="All">All (incl. history)</option>
-            <option value="Planned">Planned</option>
-            <option value="Sent">Sent</option>
-            <option value="Cancelled">Cancelled</option>
-          </select>
+    <div class="tabs" style="margin-bottom:16px">
+      <div class="tab active" data-ptab="planner-table" onclick="switchPlannerSubtab('planner-table')">📋 Table View</div>
+      <div class="tab" data-ptab="planner-calendar" onclick="switchPlannerSubtab('planner-calendar')">📅 Calendar View</div>
+    </div>
+
+    <div id="planner-table" class="planner-subtab active">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Scheduled &amp; Historical Plans</div>
         </div>
-        <div>
-          <label style="font-size:11px;font-weight:600;color:#64748B;margin-right:6px">Brand</label>
-          <select id="plannerBrandFilter" onchange="onPlannerFilterChange()" style="border:1px solid #E2E8F0;border-radius:6px;padding:5px 8px;font-size:12px;font-family:inherit">
-            <option value="">All Brands</option>
-          </select>
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+          <div>
+            <label style="font-size:11px;font-weight:600;color:#64748B;margin-right:6px">Status</label>
+            <select id="plannerStatusFilter" onchange="onPlannerFilterChange()" style="border:1px solid #E2E8F0;border-radius:6px;padding:5px 8px;font-size:12px;font-family:inherit">
+              <option value="Upcoming">Upcoming (Planned)</option>
+              <option value="All">All (incl. history)</option>
+              <option value="Planned">Planned</option>
+              <option value="Sent">Sent</option>
+              <option value="Cancelled">Cancelled</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:600;color:#64748B;margin-right:6px">Brand</label>
+            <select id="plannerBrandFilter" onchange="onPlannerFilterChange()" style="border:1px solid #E2E8F0;border-radius:6px;padding:5px 8px;font-size:12px;font-family:inherit">
+              <option value="">All Brands</option>
+            </select>
+          </div>
+          <input type="text" id="plannerSearch" class="search" placeholder="Search planner..." onkeyup="onPlannerFilterChange()" style="margin:0;max-width:220px">
         </div>
-        <input type="text" id="plannerSearch" class="search" placeholder="Search planner..." onkeyup="onPlannerFilterChange()" style="margin:0;max-width:220px">
+        <table class="questions-table" id="plannerTable">
+          <thead><tr>
+            <th style="width:110px">Planned Date</th>
+            <th>List</th>
+            <th style="width:70px">Brand</th>
+            <th style="width:110px">Country</th>
+            <th style="width:110px">Status</th>
+            <th>Notes</th>
+            <th style="width:90px">Created</th>
+            <th style="width:50px">Action</th>
+          </tr></thead>
+          <tbody id="plannerBody"></tbody>
+        </table>
       </div>
-      <table class="questions-table" id="plannerTable">
-        <thead><tr>
-          <th style="width:110px">Planned Date</th>
-          <th>List</th>
-          <th style="width:70px">Brand</th>
-          <th style="width:110px">Country</th>
-          <th style="width:110px">Status</th>
-          <th>Notes</th>
-          <th style="width:90px">Created</th>
-          <th style="width:50px">Action</th>
-        </tr></thead>
-        <tbody id="plannerBody"></tbody>
-      </table>
+    </div>
+
+    <div id="planner-calendar" class="planner-subtab" style="display:none">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Send Calendar</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <select id="calendarBrandFilter" onchange="renderPlannerCalendar()" style="border:1px solid #E2E8F0;border-radius:6px;padding:5px 8px;font-size:12px;font-family:inherit">
+              <option value="">All Brands</option>
+            </select>
+            <button class="col-toggle" onclick="calendarNav(-1)">‹ Prev</button>
+            <span id="calendarMonthLabel" style="font-weight:700;min-width:130px;text-align:center;display:inline-block;color:#0F172A"></span>
+            <button class="col-toggle" onclick="calendarNav(1)">Next ›</button>
+            <button class="col-toggle" onclick="calendarNav(0)">Today</button>
+          </div>
+        </div>
+        <div id="calendarGrid"></div>
+      </div>
     </div>
   </div>
 
@@ -1755,12 +1780,99 @@ function renderPlannerTab() {
   if (brandFilter && brandFilter.options.length <= 1) {
     brandFilter.innerHTML = '<option value="">All Brands</option>' + brands.map(b => `<option value="${escAttr(b)}">${b}</option>`).join('');
   }
+  const calBrandFilter = document.getElementById('calendarBrandFilter');
+  if (calBrandFilter && calBrandFilter.options.length <= 1) {
+    calBrandFilter.innerHTML = '<option value="">All Brands</option>' + brands.map(b => `<option value="${escAttr(b)}">${b}</option>`).join('');
+  }
 
   if (!document.getElementById('plannerDateInput').value) {
     document.getElementById('plannerDateInput').value = new Date().toISOString().slice(0, 10);
   }
 
   renderPlannerTable();
+  renderPlannerCalendar();
+}
+
+// Jumps straight from an approved list in the Master List Planner into the
+// Planner form, pre-filled — closes the Approval → Planner loop Alex described
+// ("performance analysis → AI recommendation → approval → planner → calendar").
+function scheduleFromList(list, brand, country) {
+  switchTab('planner');
+  document.getElementById('plannerListInput').value = list || '';
+  document.getElementById('plannerBrandInput').value = brand || '';
+  document.getElementById('plannerCountryInput').value = country || '';
+  document.getElementById('plannerDateInput').focus();
+}
+
+function switchPlannerSubtab(id) {
+  document.querySelectorAll('.planner-subtab').forEach(el => el.style.display = 'none');
+  document.querySelectorAll('[data-ptab]').forEach(el => el.classList.remove('active'));
+  document.getElementById(id).style.display = '';
+  document.querySelector(`[data-ptab="${id}"]`).classList.add('active');
+  if (id === 'planner-calendar') renderPlannerCalendar();
+}
+
+let calendarViewDate = new Date();
+
+function calendarNav(delta) {
+  if (delta === 0) {
+    calendarViewDate = new Date();
+  } else {
+    calendarViewDate = new Date(calendarViewDate.getFullYear(), calendarViewDate.getMonth() + delta, 1);
+  }
+  renderPlannerCalendar();
+}
+
+function renderPlannerCalendar() {
+  const grid = document.getElementById('calendarGrid');
+  if (!grid) return;
+  const brandFilter = document.getElementById('calendarBrandFilter')?.value || '';
+
+  const year = calendarViewDate.getFullYear();
+  const month = calendarViewDate.getMonth();
+  const monthLabel = document.getElementById('calendarMonthLabel');
+  if (monthLabel) monthLabel.textContent = calendarViewDate.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+
+  const plansByDate = {};
+  plannedSends.forEach(p => {
+    if (brandFilter && p.brand !== brandFilter) return;
+    if (!p.planned_date) return;
+    (plansByDate[p.planned_date] = plansByDate[p.planned_date] || []).push(p);
+  });
+
+  const firstOfMonth = new Date(year, month, 1);
+  const startWeekday = firstOfMonth.getDay(); // 0=Sun
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  let html = '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:#E2E8F0;border:1px solid #E2E8F0;border-radius:8px;overflow:hidden">';
+  dayNames.forEach(d => {
+    html += `<div style="background:#F8FAFC;padding:6px;text-align:center;font-size:11px;font-weight:700;color:#64748B">${d}</div>`;
+  });
+
+  const totalCells = Math.ceil((startWeekday + daysInMonth) / 7) * 7;
+  for (let i = 0; i < totalCells; i++) {
+    const dayNum = i - startWeekday + 1;
+    const inMonth = dayNum >= 1 && dayNum <= daysInMonth;
+    const cellDate = new Date(year, month, dayNum);
+    const dateStr = inMonth ? cellDate.toISOString().slice(0, 10) : '';
+    const plans = inMonth ? (plansByDate[dateStr] || []) : [];
+    const isToday = dateStr === todayStr;
+
+    const chips = plans.map(p => {
+      const color = p.status === 'Sent' ? '#16A34A' : p.status === 'Cancelled' ? '#94A3B8' : '#2563EB';
+      const label = (p.list.length > 16 ? p.list.slice(0, 16) + '…' : p.list) + (p.brand ? ' · ' + p.brand : '');
+      return `<div title="${escAttr(p.list)} — ${escAttr(p.brand||'')} — ${escAttr(p.country||'')} — ${p.status}${p.notes ? ' — ' + escAttr(p.notes) : ''}" style="background:${color};color:#fff;border-radius:3px;padding:1px 4px;font-size:10px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer" onclick="switchPlannerSubtab('planner-table');document.getElementById('plannerSearch').value='${escAttr(p.list)}';onPlannerFilterChange();">${escAttr(label)}</div>`;
+    }).join('');
+
+    html += `<div style="background:#fff;min-height:80px;padding:4px;${isToday?'box-shadow:inset 0 0 0 2px #0EA5E9;':''}${inMonth?'':'opacity:.35'}">
+      <div style="font-size:11px;font-weight:${isToday?'700':'600'};color:${isToday?'#0EA5E9':'#334155'}">${inMonth ? dayNum : ''}</div>
+      ${chips}
+    </div>`;
+  }
+  html += '</div>';
+  grid.innerHTML = html;
 }
 
 function onPlannerFilterChange() {
@@ -1826,6 +1938,7 @@ function addPlannedSend() {
   document.getElementById('plannerCountryInput').value = '';
   document.getElementById('plannerNotesInput').value = '';
   renderPlannerTable();
+  renderPlannerCalendar();
   syncPlannedSend(newPlan._id);
 }
 
@@ -1834,6 +1947,7 @@ function updatePlannedSend(id, field, value) {
   if (!plan) return;
   plan[field] = value;
   renderPlannerTable();
+  renderPlannerCalendar();
   syncPlannedSend(id);
 }
 
@@ -1841,6 +1955,7 @@ function deletePlannedSend(id) {
   if (!confirm('Delete this planned send?')) return;
   plannedSends = plannedSends.filter(p => p._id !== id);
   renderPlannerTable();
+  renderPlannerCalendar();
   if (sb) sb.from('planned_sends').delete().eq('id', id);
 }
 
@@ -2984,6 +3099,7 @@ function renderListPlannerTable(tableId, rows, idPrefix) {
           <option value="No" ${l.isManual && l.reuse==='No'?'selected':''}>No (Manual)</option>
         </select>
         <button data-list="${escAttr(l.list)}" onclick="viewListHistory(this.dataset.list)" title="View decision history" style="border:none;background:transparent;cursor:pointer;color:#94A3B8;font-size:11px;vertical-align:middle;padding:0 2px">🕒</button>
+        <button onclick="scheduleFromList('${escAttr(l.list)}','${escAttr(l.brand)}','${escAttr(l.country)}')" title="Schedule this list's next send in the Planner" style="border:none;background:transparent;cursor:pointer;color:#0EA5E9;font-size:11px;vertical-align:middle;padding:0 2px">📅</button>
       </td>
       <td style="font-size:11px">
         <input type="text" class="reason-input" data-list="${escAttr(l.list)}" data-orig="${escAttr(l.reason||'')}" value="${escAttr(l.reason||'')}" onblur="onReasonBlur(this)" title="${escAttr(l.reason||'—')}" style="border:1px solid transparent;background:transparent;font-size:11px;width:200px;color:${l.reason&&l.reason!=='—'?'#DC2626':'#94A3B8'};font-family:inherit">
