@@ -764,27 +764,13 @@ tbody tr:hover{background:#F8FAFC}
       </div>
     </div>
 
-    <!-- CHARTS ROW -->
-    <div class="grid-2" style="margin-bottom:24px">
-      <div class="card">
-        <div class="card-header"><div class="card-title">Sent→Click Rate by List</div></div>
-        <div class="chart-wrap">
-          <canvas id="chartListCTR"></canvas>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-header"><div class="card-title">Cost per Lead by List</div></div>
-        <div class="chart-wrap">
-          <canvas id="chartListCPL"></canvas>
-        </div>
-      </div>
-    </div>
-
     <!-- LEADS PER LIST -->
     <div class="card" style="margin-bottom:24px">
       <div class="card-header"><div class="card-title">Leads Generated per List</div></div>
-      <div class="chart-wrap">
-        <canvas id="chartListLeads"></canvas>
+      <div class="chart-wrap" id="listLeadsChartWrap" style="height:600px;overflow-y:auto;position:relative">
+        <div id="listLeadsChartInner" style="position:relative;width:100%;height:600px">
+          <canvas id="chartListLeads"></canvas>
+        </div>
       </div>
     </div>
 
@@ -2548,9 +2534,11 @@ function recomputeAggregates() {
     const bg = brandGroups[c.brand];
     bg.camps += 1; bg.sent += c.sent; bg.clicks += c.clicks; bg.leads += c.leads; bg.sales += c.sales; bg.cost += c.cost;
 
-    // List grouping (Fresh only) — normalize key so "Royboy_AU_..." and "Roy Boy_AU_..." merge
-    const nList = c.rawList ? normalizeListName(c.rawList) : '';
-    if (c.type === 'Fresh' && nList) {
+    // List grouping — normalize key so "Royboy_AU_..." and "Roy Boy_AU_..." merge.
+    // Uses c.list (not c.rawList) so Clicked/"Clickers" resends are included too —
+    // their CSV row has a blank List Name, so c.list falls back to the campaign name.
+    const nList = c.list ? normalizeListName(c.list) : '';
+    if (nList) {
       // Keep the campaign's rawList in sync with normalised form
       c.rawList = nList;
       if (!listGroups[nList]) {
@@ -2564,8 +2552,8 @@ function recomputeAggregates() {
       lg._campaigns.push(c);
     }
 
-    // Combo grouping (Fresh only)
-    if (c.type === 'Fresh' && nList) {
+    // Combo grouping
+    if (nList) {
       const comboKey = nList + '|' + c.brand + '|' + c.country;
       if (!comboGroups[comboKey]) {
         comboGroups[comboKey] = {list: nList, brand: c.brand, country: c.country, sends: 0, sent: 0, clicks: 0, leads: 0, sales: 0, cost: 0};
@@ -3270,8 +3258,6 @@ function initCharts() {
 }
 
 function renderListCharts() {
-  initListCTRChart();
-  initListCPLChart();
   initListLeadsChart();
 }
 
@@ -3540,53 +3526,16 @@ function initTopListsChart() {
   }
 }
 
-function initListCTRChart() {
-  const ctx = document.getElementById('chartListCTR')?.getContext('2d');
-  if (!ctx) return;
-  if (chartInstances['listCTR']) chartInstances['listCTR'].destroy();
-  const sorted = [...filteredLists].sort((a,b) => b.ctr - a.ctr).slice(0, 10);
-  chartInstances['listCTR'] = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: sorted.map(l => l.list),
-      datasets: [{label: 'Sent→Click %', data: sorted.map(l => (l.ctr*100).toFixed(2)), backgroundColor: '#10B981'}]
-    },
-    options: {
-      indexAxis: 'y',
-      responsive: true, maintainAspectRatio: false,
-      plugins: {legend: {display: false}},
-      scales: {x: {beginAtZero: true}},
-      ...barDrillOptions(sorted)
-    }
-  });
-}
-
-function initListCPLChart() {
-  const ctx = document.getElementById('chartListCPL')?.getContext('2d');
-  if (!ctx) return;
-  if (chartInstances['listCPL']) chartInstances['listCPL'].destroy();
-  const sorted = [...filteredLists].filter(l => l.cost_per_lead > 0).sort((a,b) => a.cost_per_lead - b.cost_per_lead).slice(0, 10);
-  chartInstances['listCPL'] = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: sorted.map(l => l.list),
-      datasets: [{label: 'Cost/Lead €', data: sorted.map(l => l.cost_per_lead.toFixed(2)), backgroundColor: '#F59E0B'}]
-    },
-    options: {
-      indexAxis: 'y',
-      responsive: true, maintainAspectRatio: false,
-      plugins: {legend: {display: false}},
-      scales: {x: {beginAtZero: true}},
-      ...barDrillOptions(sorted)
-    }
-  });
-}
-
 function initListLeadsChart() {
   const ctx = document.getElementById('chartListLeads')?.getContext('2d');
   if (!ctx) return;
   if (chartInstances['listLeads']) chartInstances['listLeads'].destroy();
-  const sorted = [...filteredLists].sort((a,b) => b.leads - a.leads).slice(0, 15);
+  const sorted = [...filteredLists].sort((a,b) => b.leads - a.leads);
+
+  // Every list gets a bar — size the scrollable inner container to fit them all legibly
+  const inner = document.getElementById('listLeadsChartInner');
+  if (inner) inner.style.height = Math.max(600, sorted.length * 26) + 'px';
+
   chartInstances['listLeads'] = new Chart(ctx, {
     type: 'bar',
     data: {
@@ -3594,8 +3543,10 @@ function initListLeadsChart() {
       datasets: [{label: 'Leads', data: sorted.map(l => l.leads), backgroundColor: '#8B5CF6'}]
     },
     options: {
+      indexAxis: 'y',
       responsive: true, maintainAspectRatio: false,
-      plugins: {legend: {display: false}}, scales: {y: {beginAtZero: true}},
+      plugins: {legend: {display: false}},
+      scales: {x: {beginAtZero: true}},
       ...barDrillOptions(sorted)
     }
   });
