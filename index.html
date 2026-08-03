@@ -676,24 +676,23 @@ tbody tr:hover{background:#F8FAFC}
       <table id="listsTable" style="font-size:12px;margin-top:12px">
         <thead><tr>
           <th onclick="sortTable('listsTable', 0)">List Name</th>
-          <th onclick="sortTable('listsTable', 1)">Brand</th>
-          <th onclick="sortTable('listsTable', 2)">Country</th>
-          <th onclick="sortTable('listsTable', 3)" class="num" title="Number of campaigns using this exact List × Brand × Country combination">Campaigns</th>
-          <th onclick="sortTable('listsTable', 4)" class="num" title="Total SMS messages sent">Sent</th>
-          <th onclick="sortTable('listsTable', 5)" class="num" title="Total link clicks">Clicks</th>
-          <th onclick="sortTable('listsTable', 6)" class="num" title="Click-Through Rate = Clicks ÷ Sent × 100">CTR</th>
-          <th onclick="sortTable('listsTable', 7)" class="num" title="Registrations (leads)">Leads</th>
-          <th onclick="sortTable('listsTable', 8)" class="num" title="Click-to-Lead Rate = Leads ÷ Clicks × 100">Cl→Lead</th>
-          <th onclick="sortTable('listsTable', 9)" class="num" title="FTDs (first-time deposits)">Sales</th>
-          <th onclick="sortTable('listsTable', 10)" class="num" title="Lead-to-Sale Rate = Sales ÷ Leads × 100">L→Sale</th>
-          <th onclick="sortTable('listsTable', 11)" class="num" title="Total SMS sending cost">Cost</th>
-          <th onclick="sortTable('listsTable', 12)" class="num" title="ECPA (FTD) = Total Spend ÷ Total Sales — matches main dashboard">ECPA (FTD)</th>
-          <th onclick="sortTable('listsTable', 13)" class="num" title="ECPA (Reg) = Total Spend ÷ Total Leads — matches main dashboard">ECPA (Reg)</th>
-          <th onclick="sortTable('listsTable', 14)" title="Date of most recent campaign using this combination">Last Used</th>
-          <th onclick="sortTable('listsTable', 15)" title="Send End Date of the most recent campaign — from the CSV's Send End Date column">Send End Date</th>
-          <th onclick="sortTable('listsTable', 16)" title="Yes = sales with ECPA (FTD) ≤ €280, or proven (>5 sends, ECPA Reg <€280) | Maybe = sales but ECPA >€280, or leads >2 | No = no results. Select Yes/Maybe/No to manually override, or 'auto' to use the computed score.">Use Again?</th>
-          <th onclick="sortTable('listsTable', 17)" title="Specific reasons why this list may not be worth reusing — editable">Reasons Not to Use</th>
-          <th onclick="sortTable('listsTable', 18)" title="Date this Use Again decision was made or last reviewed">Decision Date</th>
+          <th onclick="sortTable('listsTable', 1)">Countries</th>
+          <th onclick="sortTable('listsTable', 2)" class="num" title="Number of campaigns using this list">Campaigns</th>
+          <th onclick="sortTable('listsTable', 3)" class="num" title="Total SMS messages sent">Sent</th>
+          <th onclick="sortTable('listsTable', 4)" class="num" title="Total link clicks">Clicks</th>
+          <th onclick="sortTable('listsTable', 5)" class="num" title="Click-Through Rate = Clicks ÷ Sent × 100">CTR</th>
+          <th onclick="sortTable('listsTable', 6)" class="num" title="Registrations (leads)">Leads</th>
+          <th onclick="sortTable('listsTable', 7)" class="num" title="Click-to-Lead Rate = Leads ÷ Clicks × 100">Cl→Lead</th>
+          <th onclick="sortTable('listsTable', 8)" class="num" title="FTDs (first-time deposits)">Sales</th>
+          <th onclick="sortTable('listsTable', 9)" class="num" title="Lead-to-Sale Rate = Sales ÷ Leads × 100">L→Sale</th>
+          <th onclick="sortTable('listsTable', 10)" class="num" title="Total SMS sending cost">Cost</th>
+          <th onclick="sortTable('listsTable', 11)" class="num" title="ECPA (FTD) = Total Spend ÷ Total Sales — matches main dashboard">ECPA (FTD)</th>
+          <th onclick="sortTable('listsTable', 12)" class="num" title="ECPA (Reg) = Total Spend ÷ Total Leads — matches main dashboard">ECPA (Reg)</th>
+          <th onclick="sortTable('listsTable', 13)" title="Date of most recent campaign using this list">Last Used</th>
+          <th onclick="sortTable('listsTable', 14)" title="Send End Date of the most recent campaign — from the CSV's Send End Date column">Send End Date</th>
+          <th onclick="sortTable('listsTable', 15)" title="Yes = sales with ECPA (FTD) ≤ €280, or proven (>5 sends, ECPA Reg <€280) | Maybe = sales but ECPA >€280, or leads >2 | No = no results. Select Yes/Maybe/No to manually override, or 'auto' to use the computed score.">Use Again?</th>
+          <th onclick="sortTable('listsTable', 16)" title="Specific reasons why this list may not be worth reusing — editable">Reasons Not to Use</th>
+          <th onclick="sortTable('listsTable', 17)" title="Date this Use Again decision was made or last reviewed">Decision Date</th>
         </tr></thead>
         <tbody id="listsTable-body"></tbody>
       </table>
@@ -715,24 +714,23 @@ tbody tr:hover{background:#F8FAFC}
       <table id="clickerListsTable" style="font-size:12px;margin-top:12px">
         <thead><tr>
           <th onclick="sortTable('clickerListsTable', 0)">List Name</th>
-          <th onclick="sortTable('clickerListsTable', 1)">Brand</th>
-          <th onclick="sortTable('clickerListsTable', 2)">Country</th>
-          <th onclick="sortTable('clickerListsTable', 3)" class="num" title="Number of campaigns using this exact List × Brand × Country combination">Campaigns</th>
-          <th onclick="sortTable('clickerListsTable', 4)" class="num" title="Total SMS messages sent">Sent</th>
-          <th onclick="sortTable('clickerListsTable', 5)" class="num" title="Total link clicks">Clicks</th>
-          <th onclick="sortTable('clickerListsTable', 6)" class="num" title="Click-Through Rate = Clicks ÷ Sent × 100">CTR</th>
-          <th onclick="sortTable('clickerListsTable', 7)" class="num" title="Registrations (leads)">Leads</th>
-          <th onclick="sortTable('clickerListsTable', 8)" class="num" title="Click-to-Lead Rate = Leads ÷ Clicks × 100">Cl→Lead</th>
-          <th onclick="sortTable('clickerListsTable', 9)" class="num" title="FTDs (first-time deposits)">Sales</th>
-          <th onclick="sortTable('clickerListsTable', 10)" class="num" title="Lead-to-Sale Rate = Sales ÷ Leads × 100">L→Sale</th>
-          <th onclick="sortTable('clickerListsTable', 11)" class="num" title="Total SMS sending cost">Cost</th>
-          <th onclick="sortTable('clickerListsTable', 12)" class="num" title="ECPA (FTD) = Total Spend ÷ Total Sales — matches main dashboard">ECPA (FTD)</th>
-          <th onclick="sortTable('clickerListsTable', 13)" class="num" title="ECPA (Reg) = Total Spend ÷ Total Leads — matches main dashboard">ECPA (Reg)</th>
-          <th onclick="sortTable('clickerListsTable', 14)" title="Date of most recent campaign using this combination">Last Used</th>
-          <th onclick="sortTable('clickerListsTable', 15)" title="Send End Date of the most recent campaign — from the CSV's Send End Date column">Send End Date</th>
-          <th onclick="sortTable('clickerListsTable', 16)" title="Yes = sales with ECPA (FTD) ≤ €280, or proven (>5 sends, ECPA Reg <€280) | Maybe = sales but ECPA >€280, or leads >2 | No = no results. Select Yes/Maybe/No to manually override, or 'auto' to use the computed score.">Use Again?</th>
-          <th onclick="sortTable('clickerListsTable', 17)" title="Specific reasons why this list may not be worth reusing — editable">Reasons Not to Use</th>
-          <th onclick="sortTable('clickerListsTable', 18)" title="Date this Use Again decision was made or last reviewed">Decision Date</th>
+          <th onclick="sortTable('clickerListsTable', 1)">Countries</th>
+          <th onclick="sortTable('clickerListsTable', 2)" class="num" title="Number of campaigns using this list">Campaigns</th>
+          <th onclick="sortTable('clickerListsTable', 3)" class="num" title="Total SMS messages sent">Sent</th>
+          <th onclick="sortTable('clickerListsTable', 4)" class="num" title="Total link clicks">Clicks</th>
+          <th onclick="sortTable('clickerListsTable', 5)" class="num" title="Click-Through Rate = Clicks ÷ Sent × 100">CTR</th>
+          <th onclick="sortTable('clickerListsTable', 6)" class="num" title="Registrations (leads)">Leads</th>
+          <th onclick="sortTable('clickerListsTable', 7)" class="num" title="Click-to-Lead Rate = Leads ÷ Clicks × 100">Cl→Lead</th>
+          <th onclick="sortTable('clickerListsTable', 8)" class="num" title="FTDs (first-time deposits)">Sales</th>
+          <th onclick="sortTable('clickerListsTable', 9)" class="num" title="Lead-to-Sale Rate = Sales ÷ Leads × 100">L→Sale</th>
+          <th onclick="sortTable('clickerListsTable', 10)" class="num" title="Total SMS sending cost">Cost</th>
+          <th onclick="sortTable('clickerListsTable', 11)" class="num" title="ECPA (FTD) = Total Spend ÷ Total Sales — matches main dashboard">ECPA (FTD)</th>
+          <th onclick="sortTable('clickerListsTable', 12)" class="num" title="ECPA (Reg) = Total Spend ÷ Total Leads — matches main dashboard">ECPA (Reg)</th>
+          <th onclick="sortTable('clickerListsTable', 13)" title="Date of most recent campaign using this list">Last Used</th>
+          <th onclick="sortTable('clickerListsTable', 14)" title="Send End Date of the most recent campaign — from the CSV's Send End Date column">Send End Date</th>
+          <th onclick="sortTable('clickerListsTable', 15)" title="Yes = sales with ECPA (FTD) ≤ €280, or proven (>5 sends, ECPA Reg <€280) | Maybe = sales but ECPA >€280, or leads >2 | No = no results. Select Yes/Maybe/No to manually override, or 'auto' to use the computed score.">Use Again?</th>
+          <th onclick="sortTable('clickerListsTable', 16)" title="Specific reasons why this list may not be worth reusing — editable">Reasons Not to Use</th>
+          <th onclick="sortTable('clickerListsTable', 17)" title="Date this Use Again decision was made or last reviewed">Decision Date</th>
         </tr></thead>
         <tbody id="clickerListsTable-body"></tbody>
       </table>
@@ -2017,7 +2015,7 @@ async function clearListDecision(list) {
 // rebuild the whole tbody and silently discard the user's current sort order,
 // expanded/collapsed drill-downs, search filter and column visibility toggles.
 function refreshListRows(list) {
-  const combo = filteredCombosMain.find(l => l.list === list) || filteredCombosClickers.find(l => l.list === list);
+  const combo = filteredListsMain.find(l => l.list === list) || filteredListsClickers.find(l => l.list === list);
   if (!combo) return;
   document.querySelectorAll('tr.list-summary-row').forEach(row => {
     if (row.dataset.list !== list) return;
@@ -2382,9 +2380,8 @@ let filteredCampaigns = [...campaigns];
 let filteredCountries = [...countries];
 let filteredBrands = [...brands];
 let filteredLists = [...lists];
-let filteredCombos = [...combos];
-let filteredCombosMain = []; // List×Brand×Country rows for real send lists (Master List Planner) — never mixed with Clicker rows
-let filteredCombosClickers = []; // List×Brand×Country rows for Clicker/retargeting segments only
+let filteredListsMain = []; // per-list rows for real send lists (Master List Planner) — never mixed with Clicker rows
+let filteredListsClickers = []; // per-list rows for Clicker/retargeting segments only
 let listDecisions = {}; // manual Use Again overrides, keyed by normalized list name — see recomputeAggregates()
 let plannedSends = []; // Planner tab: scheduled + historical sends, backed by the planned_sends table
 
@@ -2823,7 +2820,6 @@ function recomputeAggregates() {
   const countryGroups = {};
   const brandGroups = {};
   const listGroups = {};
-  const comboGroups = {};
 
   filteredCampaigns.forEach(c => {
     // Country grouping
@@ -2840,39 +2836,30 @@ function recomputeAggregates() {
     const bg = brandGroups[c.brand];
     bg.camps += 1; bg.sent += c.sent; bg.clicks += c.clicks; bg.leads += c.leads; bg.sales += c.sales; bg.cost += c.cost;
 
-    // List grouping — normalize key so "Royboy_AU_..." and "Roy Boy_AU_..." merge.
-    // Uses c.list (not c.rawList) so Clicked/"Clickers" resends are included too —
-    // their CSV row has a blank List Name, so c.list falls back to the campaign name.
+    // List grouping — one row per LIST only, not per Brand/Country. Use Again
+    // decisions are made about the physical list itself; which brand it's sent
+    // under for a given week is decided separately in the Planner, so brand is
+    // deliberately not part of this grouping. Normalize key so "Royboy_AU_..."
+    // and "Roy Boy_AU_..." merge. Uses c.list (not c.rawList) so Clicked/
+    // "Clickers" resends are included too — their CSV row has a blank List
+    // Name, so c.list falls back to the campaign name. The key is type-prefixed
+    // so a Clicker retargeting segment can never merge with a same-named main list.
     const nList = c.list ? normalizeListName(c.list) : '';
     if (nList) {
       // Keep the campaign's rawList in sync with normalised form
       c.rawList = nList;
-      if (!listGroups[nList]) {
-        listGroups[nList] = {list: nList, camps: 0, sent: 0, clicks: 0, leads: 0, sales: 0, cost: 0, _countries: new Set(), _dates: [], _laps: 0, _campaigns: []};
+      const isClicker = c.type === 'Clicked';
+      const listKey = (isClicker ? 'CLK:' : 'FRESH:') + nList;
+      if (!listGroups[listKey]) {
+        listGroups[listKey] = {list: nList, isClicker, camps: 0, sent: 0, clicks: 0, leads: 0, sales: 0, cost: 0, _countries: new Set(), _dates: [], _sendEndDates: [], _laps: 0, _campaigns: []};
       }
-      const lg = listGroups[nList];
+      const lg = listGroups[listKey];
       lg.camps += 1; lg.sent += c.sent; lg.clicks += c.clicks; lg.leads += c.leads; lg.sales += c.sales; lg.cost += c.cost;
       if (c.country) lg._countries.add(c.country);
       if (c.date) lg._dates.push(c.date);
+      if (c.sendEndDate) lg._sendEndDates.push(c.sendEndDate);
       lg._laps += (c.laps || 0);
       lg._campaigns.push(c);
-    }
-
-    // Combo grouping (List × Brand × Country) — the isClicker flag is baked into the
-    // key itself so a Clicker retargeting segment can never be aggregated together
-    // with a same-named main list, even if such a name collision ever occurred.
-    if (nList) {
-      const isClicker = c.type === 'Clicked';
-      const comboKey = (isClicker ? 'CLK:' : 'FRESH:') + nList + '|' + c.brand + '|' + c.country;
-      if (!comboGroups[comboKey]) {
-        comboGroups[comboKey] = {list: nList, brand: c.brand, country: c.country, isClicker, camps: 0, sends: 0, sent: 0, clicks: 0, leads: 0, sales: 0, cost: 0, _dates: [], _sendEndDates: [], _laps: 0, _campaigns: []};
-      }
-      const cbg = comboGroups[comboKey];
-      cbg.sends += 1; cbg.camps += 1; cbg.sent += c.sent; cbg.clicks += c.clicks; cbg.leads += c.leads; cbg.sales += c.sales; cbg.cost += c.cost;
-      if (c.date) cbg._dates.push(c.date);
-      if (c.sendEndDate) cbg._sendEndDates.push(c.sendEndDate);
-      cbg._laps += (c.laps || 0);
-      cbg._campaigns.push(c);
     }
   });
 
@@ -2944,11 +2931,10 @@ function recomputeAggregates() {
   filteredCountries = Object.values(countryGroups).map(computeMetrics).sort((a,b) => b.ctr - a.ctr);
   filteredBrands = Object.values(brandGroups).map(computeMetrics).sort((a,b) => b.ctr - a.ctr);
   filteredLists = Object.values(listGroups).map(computeMetrics).sort((a,b) => b.roi - a.roi);
-  filteredCombos = Object.values(comboGroups).map(computeMetrics).sort((a,b) => b.sales - a.sales);
   // Split strictly by type — Clicker/retargeting segments are a fundamentally different
   // audience from main lists and must never be aggregated or displayed together.
-  filteredCombosMain = filteredCombos.filter(c => !c.isClicker);
-  filteredCombosClickers = filteredCombos.filter(c => c.isClicker);
+  filteredListsMain = filteredLists.filter(l => !l.isClicker).sort((a,b) => b.sales - a.sales);
+  filteredListsClickers = filteredLists.filter(l => l.isClicker).sort((a,b) => b.sales - a.sales);
 }
 
 // ── COST BREAKDOWN TABLE ───────────────────
@@ -3040,19 +3026,21 @@ function renderBrandsTable() {
   attachColumnFilters('brandsTable');
 }
 
-const LIST_PLANNER_COLS = 19; // total columns in Master List Planner / Clicker Lists tables
+const LIST_PLANNER_COLS = 18; // total columns in Master List Planner / Clicker Lists tables
 
 function renderListsTable() {
-  renderListPlannerTable('listsTable', filteredCombosMain, 'list');
+  renderListPlannerTable('listsTable', filteredListsMain, 'list');
 }
 
 function renderClickerListsTable() {
-  renderListPlannerTable('clickerListsTable', filteredCombosClickers, 'clk');
+  renderListPlannerTable('clickerListsTable', filteredListsClickers, 'clk');
 }
 
 // Shared renderer for the Master List Planner and Clicker Lists tables.
-// Both are List × Brand × Country rows; idPrefix keeps their expand/collapse
-// row ids from colliding when both tables are on the page at once.
+// One row per LIST (not per Brand/Country) — Use Again decisions are about the
+// list itself; which brand it's sent under for a given week is a Planner
+// decision, made independently each time, so it isn't part of this grouping.
+// idPrefix keeps the two tables' expand/collapse row ids from colliding.
 function renderListPlannerTable(tableId, rows, idPrefix) {
   const tbody = document.getElementById(tableId + '-body');
   if (!tbody) return;
@@ -3062,8 +3050,8 @@ function renderListPlannerTable(tableId, rows, idPrefix) {
     const ecpa_reg = l.leads > 0 ? l.cost / l.leads : 0;
     const lid = idPrefix + '-' + idx;
 
-    // Campaigns are already scoped to this exact List × Brand × Country combo
-    // (and to Fresh vs Clicker, via recomputeAggregates) — no re-filtering needed.
+    // Campaigns are already scoped to this exact list (and to Fresh vs
+    // Clicker, via recomputeAggregates) — no re-filtering needed.
     const listCampaigns = (l.campaigns || []);
 
     // Build campaign sub-rows
@@ -3076,6 +3064,7 @@ function renderListPlannerTable(tableId, rows, idPrefix) {
       return `<tr>
         <td title="${c.date}">${c.date || '—'}</td>
         <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${c.name}">${c.name}</td>
+        <td style="font-size:11px;color:#64748B">${c.country || '—'}</td>
         <td style="font-size:11px" title="${escAttr(c.sendingPeriod||'')}">${c.sendingPeriod || '—'}</td>
         <td style="font-size:11px">${c.sendEndDate || '—'}</td>
         <td class="num" title="SMS messages sent">${fmtN(c.sent)}</td>
@@ -3095,12 +3084,11 @@ function renderListPlannerTable(tableId, rows, idPrefix) {
       <td style="white-space:nowrap">
         <div style="display:flex;align-items:center;gap:6px">
           <button class="list-expand-btn" id="btn-${lid}" onclick="toggleListDetail('${lid}')" title="Show all ${listCampaigns.length} campaigns">▶</button>
-          <span style="overflow:hidden;text-overflow:ellipsis;max-width:175px;display:inline-block" title="${l.list} — ${l.brand} — ${l.country} — ${l.camps} campaign(s)">${l.list}</span>
+          <span style="overflow:hidden;text-overflow:ellipsis;max-width:175px;display:inline-block" title="${l.list} — ${l.countries} — ${l.camps} campaign(s)">${l.list}</span>
         </div>
       </td>
-      <td style="font-size:11px;color:#64748B">${l.brand || '—'}</td>
-      <td style="font-size:11px;color:#64748B">${l.country || '—'}</td>
-      <td class="num" title="${l.camps} campaign(s) used this exact List × Brand × Country combination">${fmtN(l.camps)}</td>
+      <td style="font-size:11px;color:#64748B" title="${l.countries}">${l.countries}</td>
+      <td class="num" title="${l.camps} campaign(s) used this list">${fmtN(l.camps)}</td>
       <td class="num" title="Total sent across all campaigns">${fmtN(l.sent)}</td>
       <td class="num" title="Total clicks">${fmtN(l.clicks)}</td>
       <td class="num" title="CTR = ${fmtN(l.clicks)} ÷ ${fmtN(l.sent)} = ${(l.ctr*100).toFixed(2)}%">${(l.ctr*100).toFixed(2)}%</td>
@@ -3121,7 +3109,7 @@ function renderListPlannerTable(tableId, rows, idPrefix) {
           <option value="No" ${l.isManual && l.reuse==='No'?'selected':''}>No (Manual)</option>
         </select>
         <button data-list="${escAttr(l.list)}" onclick="viewListHistory(this.dataset.list)" title="View decision history" style="border:none;background:transparent;cursor:pointer;color:#94A3B8;font-size:11px;vertical-align:middle;padding:0 2px">🕒</button>
-        <button onclick="scheduleFromList('${escAttr(l.list)}','${escAttr(l.brand)}','${escAttr(l.country)}')" title="Schedule this list's next send in the Planner" style="border:none;background:transparent;cursor:pointer;color:#0EA5E9;font-size:11px;vertical-align:middle;padding:0 2px">📅</button>
+        <button onclick="scheduleFromList('${escAttr(l.list)}','','')" title="Schedule this list's next send in the Planner — pick the brand and date there" style="border:none;background:transparent;cursor:pointer;color:#0EA5E9;font-size:11px;vertical-align:middle;padding:0 2px">📅</button>
       </td>
       <td style="font-size:11px">
         <input type="text" class="reason-input" data-list="${escAttr(l.list)}" data-orig="${escAttr(l.reason||'')}" value="${escAttr(l.reason||'')}" onblur="onReasonBlur(this)" title="${escAttr(l.reason||'—')}" style="border:1px solid transparent;background:transparent;font-size:11px;width:200px;color:${l.reason&&l.reason!=='—'?'#DC2626':'#94A3B8'};font-family:inherit">
@@ -3135,12 +3123,12 @@ function renderListPlannerTable(tableId, rows, idPrefix) {
       <td colspan="${LIST_PLANNER_COLS}" style="padding:0">
         <div class="list-detail-inner">
           <div style="font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">
-            ${listCampaigns.length} campaign${listCampaigns.length!==1?'s':''} using <span style="color:#3B82F6">${l.list}</span> (${l.brand} / ${l.country})
+            ${listCampaigns.length} campaign${listCampaigns.length!==1?'s':''} using <span style="color:#3B82F6">${l.list}</span> (${l.countries})
           </div>
           <div style="overflow-x:auto">
           <table>
             <thead><tr>
-              <th>Date</th><th>Campaign Name</th><th>Sending Period</th><th>Send End Date</th>
+              <th>Date</th><th>Campaign Name</th><th>Country</th><th>Sending Period</th><th>Send End Date</th>
               <th class="num">Sent</th><th class="num">Clicks</th><th class="num">CTR</th>
               <th class="num">Leads</th><th class="num">Cl→Lead</th>
               <th class="num">Sales</th><th class="num">L→Sale</th>
@@ -3156,7 +3144,7 @@ function renderListPlannerTable(tableId, rows, idPrefix) {
     return summaryRow + detailRow;
   }).join('');
 
-  const cols = ['List', 'Brand', 'Country', 'Campaigns', 'Sent', 'Clicks', 'CTR', 'Leads', 'Cl→Lead', 'Sales', 'L→Sale', 'Cost', 'ECPA (FTD)', 'ECPA (Reg)', 'Last Used', 'Send End Date', 'Use Again?', 'Reasons Not to Use', 'Decision Date'];
+  const cols = ['List', 'Countries', 'Campaigns', 'Sent', 'Clicks', 'CTR', 'Leads', 'Cl→Lead', 'Sales', 'L→Sale', 'Cost', 'ECPA (FTD)', 'ECPA (Reg)', 'Last Used', 'Send End Date', 'Use Again?', 'Reasons Not to Use', 'Decision Date'];
   initColToggle(tableId, cols);
   attachColumnFilters(tableId);
 }
