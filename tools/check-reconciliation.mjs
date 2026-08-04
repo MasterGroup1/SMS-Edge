@@ -112,6 +112,33 @@ if (!campaigns) {
   console.log(`\n  Dataset totals: ${campaigns.length} campaigns, ${totals.join(', ')}`);
 }
 
+// ── 4. Every Supabase write must check its error ────────────────────────────
+// The client returns { error } rather than throwing, so an unchecked write
+// silently discards data: the UI updates and nothing persists.
+console.log('\nSupabase writes are error-checked:');
+{
+  const WRITES = /sb\s*\.from\([^)]*\)\s*\.\s*(upsert|insert|update|delete)\b/g;
+  const unchecked = [];
+  for (const m of src.matchAll(WRITES)) {
+    // Walk back over whitespace/await to see how the statement begins.
+    const before = src.slice(Math.max(0, m.index - 240), m.index);
+    const wrapped = /dbWrite\(\s*(['"`])[\s\S]*?\1\s*,\s*$/.test(before);
+    const destructured = /const\s*\{[^}]*error[^}]*\}\s*=\s*await\s*$/.test(before);
+    if (!wrapped && !destructured) {
+      unchecked.push({ line: src.slice(0, m.index).split('\n').length, op: m[0].replace(/\s+/g, '') });
+    }
+  }
+  if (unchecked.length) {
+    fail(
+      `${unchecked.length} Supabase write(s) ignore the returned error`,
+      unchecked.map((u) => `index.html:${u.line}  ${u.op}`).join('\n') +
+        '\nWrap in dbWrite(label, query) or destructure { error } and handle it.'
+    );
+  } else {
+    pass('all Supabase writes are wrapped or error-checked');
+  }
+}
+
 console.log(
   failures === 0
     ? '\n[32mAll reconciliation checks passed.[0m\n'

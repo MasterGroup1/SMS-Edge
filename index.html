@@ -1664,6 +1664,47 @@ function setDbStatus(state, msg) {
   if (lbl) lbl.textContent = msg || state;
 }
 
+// Non-blocking failure banner. Writes happen on nearly every interaction, so an
+// alert() per failure would be unusable — but a silent failure is worse, because
+// the change stays on screen while nothing is stored.
+function showDbError(msg) {
+  let box = document.getElementById('dbErrorBar');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'dbErrorBar';
+    box.style.cssText = 'position:fixed;bottom:16px;right:16px;z-index:9999;max-width:420px;' +
+      'background:#7F1D1D;color:#FEF2F2;border:1px solid #DC2626;border-radius:8px;' +
+      'padding:12px 14px;font-size:12px;line-height:1.5;box-shadow:0 8px 24px rgba(0,0,0,.28);' +
+      'font-family:inherit;cursor:pointer';
+    box.title = 'Click to dismiss';
+    box.onclick = () => box.remove();
+    document.body.appendChild(box);
+  }
+  box.innerHTML = '<strong>Not saved</strong><br>' + msg +
+    '<div style="margin-top:6px;opacity:.75;font-size:11px">Click to dismiss</div>';
+}
+
+// EVERY Supabase write must go through this. The client RETURNS { error } rather
+// than throwing, so an unchecked `await sb.from(...)...` swallows the failure —
+// a missing table or a denied RLS policy is indistinguishable from success. That
+// is how manual Use Again decisions were being lost: the UI updated, the row
+// never persisted, and the change disappeared on the next reload.
+// Returns true on success, false on failure (caller may roll back local state).
+async function dbWrite(label, query) {
+  const { error } = await query;
+  if (error) {
+    console.error(`[db] ${label} failed:`, error);
+    const missing = error.code === '42P01' || /does not exist|not find the table/i.test(error.message || '');
+    showDbError(
+      `${label} — ${error.message || 'unknown error'}` +
+      (missing ? '<br>The table is missing. Run <code>tools/supabase-schema.sql</code> in the Supabase SQL editor.' : '')
+    );
+    setDbStatus('offline', 'Save failed');
+    return false;
+  }
+  return true;
+}
+
 // Supabase's PostgREST API enforces its own server-side "Max Rows" cap
 // (Project Settings → API → Max Rows, often defaulted to 1000) regardless of
 // any .limit() requested by the client — a single request silently comes back
@@ -1697,6 +1738,21 @@ async function initSupabase() {
       sb.from('planned_sends').select('*').order('planned_date'),
       sb.from('list_sizes').select('*')
     ]);
+    // A missing table is otherwise indistinguishable from "no rows yet", so the
+    // dashboard would quietly show zero saved decisions forever. Name the tables
+    // that failed so it's obvious the schema needs applying, not that the data
+    // was never entered.
+    const loadFailures = [
+      [campErr, 'campaigns'], [contErr, 'content_rows'], [decErr, 'list_decisions'],
+      [planErr, 'planned_sends'], [sizeErr, 'list_sizes']
+    ].filter(([e]) => e);
+    if (loadFailures.length) {
+      loadFailures.forEach(([e, t]) => console.error(`[db] load ${t} failed:`, e));
+      showDbError(
+        'Could not load: ' + loadFailures.map(([, t]) => t).join(', ') +
+        '.<br>If these tables are missing, run <code>tools/supabase-schema.sql</code> in the Supabase SQL editor.'
+      );
+    }
     if (!planErr && dbPlans) {
       plannedSends = dbPlans.map(p => ({
         _id: p.id, planned_date: p.planned_date || '', list: p.list || '',
@@ -1774,17 +1830,17 @@ async function syncContentRow(idx) {
   const r = contentRows[idx];
   if (!r) return;
   if (!r._id) r._id = crypto.randomUUID();
-  await sb.from('content_rows').upsert({
+  await dbWrite('Save content row', sb.from('content_rows').upsert({
     id: r._id, campaign: r.campaign || '', copy: r.copy || '', route: r.route || '',
     date: r.date || '', sent: r.sent || 0, clicks: r.clicks || 0,
     signups: r.signups || 0, ftds: r.ftds || 0,
     status: r.status || 'Draft', notes: r.notes || '', sort_order: idx
-  }, { onConflict: 'id' });
+  }, { onConflict: 'id' }));
 }
 
 async function deleteContentRowFromDB(id) {
   if (!sb || !id) return;
-  await sb.from('content_rows').delete().eq('id', id);
+  await dbWrite('Delete content row', sb.from('content_rows').delete().eq('id', id));
 }
 
 // ── PLANNER (schedule future sends by date/brand; history kept for reference) ──
@@ -1848,7 +1904,7 @@ async function onWhenUsedChange(input) {
   if (!newDate) {
     if (id) {
       plannedSends = plannedSends.filter(p => p._id !== id);
-      if (sb) await sb.from('planned_sends').delete().eq('id', id);
+      if (sb) await dbWrite('Delete planned send', sb.from('planned_sends').delete().eq('id', id));
     }
   } else if (id) {
     const plan = plannedSends.find(p => p._id === id);
@@ -2023,18 +2079,18 @@ function deletePlannedSend(id) {
   plannedSends = plannedSends.filter(p => p._id !== id);
   renderPlannerTable();
   renderPlannerCalendar();
-  if (sb) sb.from('planned_sends').delete().eq('id', id);
+  if (sb) dbWrite('Delete planned send', sb.from('planned_sends').delete().eq('id', id));
 }
 
 async function syncPlannedSend(id) {
   if (!sb) return;
   const p = plannedSends.find(x => x._id === id);
   if (!p) return;
-  await sb.from('planned_sends').upsert({
+  await dbWrite('Save planned send', sb.from('planned_sends').upsert({
     id: p._id, planned_date: p.planned_date || null, list: p.list || '',
     brand: p.brand || '', country: p.country || '', status: p.status || 'Planned',
     notes: p.notes || ''
-  }, { onConflict: 'id' });
+  }, { onConflict: 'id' }));
 }
 
 // ── LIST DECISIONS (manual Use Again override + audit trail) ──
@@ -2042,8 +2098,9 @@ async function saveListDecision(list, useAgain, reason, decisionDate) {
   if (!sb) { alert('Not connected to Supabase — decision not saved'); return; }
   decisionDate = decisionDate || new Date().toISOString().slice(0, 10);
   const row = { list, use_again: useAgain || null, reason: reason || '', decision_date: decisionDate };
-  await sb.from('list_decisions').upsert(row, { onConflict: 'list' });
-  await sb.from('list_decision_history').insert(row);
+  const saved = await dbWrite('Save Use Again decision', sb.from('list_decisions').upsert(row, { onConflict: 'list' }));
+  if (!saved) return; // don't show a decision as applied when it wasn't stored
+  await dbWrite('Record decision history', sb.from('list_decision_history').insert(row));
   listDecisions[list] = row;
   recomputeAggregates();
   refreshListRows(list);
@@ -2053,16 +2110,24 @@ async function saveListDecision(list, useAgain, reason, decisionDate) {
 // Send-or-Not decision (which deletes its list_decisions row) never wipes it.
 async function updateListSize(list, size) {
   const n = Number(size) || 0;
+  const prev = listSizes[list];
   listSizes[list] = n;
   recomputeAggregates();
   refreshListRows(list);
-  if (sb) await sb.from('list_sizes').upsert({ list, size: n }, { onConflict: 'list' });
+  if (!sb) return;
+  const saved = await dbWrite('Save list size', sb.from('list_sizes').upsert({ list, size: n }, { onConflict: 'list' }));
+  if (!saved) { // roll back so the table never shows a size that isn't stored
+    if (prev === undefined) delete listSizes[list]; else listSizes[list] = prev;
+    recomputeAggregates();
+    refreshListRows(list);
+  }
 }
 
 async function clearListDecision(list) {
   if (!sb) { alert('Not connected to Supabase — decision not cleared'); return; }
-  await sb.from('list_decisions').delete().eq('list', list);
-  await sb.from('list_decision_history').insert({ list, use_again: null, reason: '', decision_date: null });
+  const cleared = await dbWrite('Clear Use Again decision', sb.from('list_decisions').delete().eq('list', list));
+  if (!cleared) return;
+  await dbWrite('Record decision history', sb.from('list_decision_history').insert({ list, use_again: null, reason: '', decision_date: null }));
   delete listDecisions[list];
   recomputeAggregates();
   refreshListRows(list);
@@ -3292,13 +3357,13 @@ async function updateCampaignBrand(id, value) {
   c.brand = value;
   applyFilters();
   if (sb) {
-    await sb.from('campaigns').upsert({
+    await dbWrite('Save brand override', sb.from('campaigns').upsert({
       id: c.id, name: c.name, country: c.country, brand: c.brand, type: c.type,
       list: c.list, laps: c.laps, sent: c.sent, clicks: c.clicks, leads: c.leads,
       sales: c.sales, cost: c.cost, revenue: c.revenue, roi: c.roi, ctr: c.ctr,
       cpa: c.cpa, ecpa: c.ecpa || 0, breakeven: c.breakeven, profitable: c.profitable,
       created: c.created, date: c.date, raw_list: c.rawList || '', partner: c.partner || ''
-    }, { onConflict: 'id' });
+    }, { onConflict: 'id' }));
   }
 }
 
