@@ -4347,6 +4347,11 @@ function rebuildFilterOptions() {
 
 // ── INIT ───────────────────────────────────
 function initApp() {
+  // recomputeAggregates() was previously only triggered by a filter change —
+  // Countries/Brands/Master List Planner/Clicker Lists all depend on it, so
+  // without this they render completely empty on every fresh page load until
+  // the user happens to touch a filter.
+  recomputeAggregates();
   updateKPIs();
   updateCostBreakdown();
   renderQuestionsTable();
