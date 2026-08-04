@@ -2848,6 +2848,11 @@ function recomputeAggregates() {
     if (nList) {
       // Keep the campaign's rawList in sync with normalised form
       c.rawList = nList;
+    }
+    // Junk/legacy lists (QA test sends, general combined Clicker buckets) are
+    // excluded from the list-planning tables but the campaign itself stays in
+    // the full dataset (KPIs, All Campaigns, CSV export) untouched.
+    if (nList && !isJunkList(nList)) {
       const isClicker = c.type === 'Clicked';
       const listKey = (isClicker ? 'CLK:' : 'FRESH:') + nList;
       if (!listGroups[listKey]) {
@@ -4303,6 +4308,24 @@ function normalizeListName(name) {
     .replace(/_ /g, '_')             // "IT_ 30032026" → "IT_30032026"
     .replace(/\s+/g, ' ')            // collapse multiple spaces
     .trim();
+}
+
+// Lists that shouldn't appear in the Master List Planner / Clicker Lists
+// planning views: internal QA test sends that ended up in the real CSV
+// export, and legacy general/combined Clicker buckets (e.g. "DE Clicked Roy
+// Boy", "Clickers - All Partners") that have since been superseded by
+// specific per-batch Clicker lists and are no longer used going forward.
+// The underlying campaigns stay in the full dataset (KPIs, All Campaigns,
+// CSV export) — this only hides them from the two list-planning tables.
+function isJunkList(name) {
+  if (!name) return false;
+  const n = name.trim();
+  if (/\btest\b/i.test(n)) return true;
+  if (/^pasted$/i.test(n)) return true;
+  if (/^seed\s?list$/i.test(n)) return true;
+  if (/^clickers\s*-\s*all partners$/i.test(n)) return true;
+  if (/^[A-Za-z]{2}\s+clicked\s+/i.test(n)) return true; // e.g. "DE Clicked Roy Boy", "AU Clicked Roy Boy"
+  return false;
 }
 
 function extractPartnerJS(listName) {
