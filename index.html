@@ -465,7 +465,7 @@ tbody tr:hover{background:#F8FAFC}
       <div class="kpi-card" id="kpi-card-camps">
         <div class="kpi-label" title="Count of all campaigns in the selected filters">Total Campaigns</div>
         <div class="kpi-value" id="kpi-camps">0</div>
-        <div class="kpi-sub" id="kpi-camps-sub">0 profitable</div>
+        <div class="kpi-sub" id="kpi-camps-sub">0 sent</div>
       </div>
       <div class="kpi-card" id="kpi-card-sales">
         <div class="kpi-label" title="Sum of all FTD (first-time deposits / sales) across campaigns">Total Sales</div>
@@ -2735,7 +2735,6 @@ function switchTab(tabName) {
 // ── KPI UPDATES ────────────────────────────
 function updateKPIs() {
   const total_camps = filteredCampaigns.length;
-  const profitable = filteredCampaigns.filter(c => c.profitable).length;
   const total_sales = filteredCampaigns.reduce((s,c) => s + (Number(c.sales)||0), 0);
   const total_leads = filteredCampaigns.reduce((s,c) => s + (Number(c.leads)||0), 0);
   const total_cost  = filteredCampaigns.reduce((s,c) => s + (Number(c.cost)||0), 0);
@@ -2746,9 +2745,11 @@ function updateKPIs() {
   const total_clicks = filteredCampaigns.reduce((s,c) => s + (Number(c.clicks)||0), 0);
   const overall_ctr = total_sent > 0 ? (total_clicks / total_sent * 100).toFixed(2) : '0.00';
 
+  // No "N profitable" here: it counted sales × an assumed €20 against cost, so it
+  // reported the assumption rather than a measured result. Removed with ROI.
   document.getElementById('kpi-camps').innerText = fmtN(total_camps);
-  document.getElementById('kpi-camps').title = total_camps + ' total campaigns (' + profitable + ' profitable, ' + (total_camps - profitable) + ' unprofitable). A campaign is profitable when sales × €20 revenue exceeds total SMS cost.';
-  document.getElementById('kpi-camps-sub').innerText = profitable + ' profitable';
+  document.getElementById('kpi-camps').title = total_camps + ' campaigns in the current filter';
+  document.getElementById('kpi-camps-sub').innerText = fmtN(total_sent) + ' sent';
 
   document.getElementById('kpi-sales').innerText = fmtN(total_sales);
   document.getElementById('kpi-sales').title = total_sales + ' FTDs (sales) from ' + fmtN(total_leads) + ' leads. Conversion: ' + (total_leads > 0 ? (total_sales/total_leads*100).toFixed(1) : '0') + '%';
@@ -2951,6 +2952,27 @@ function applyFilters() {
 }
 
 // ── RECOMPUTE AGGREGATES FROM FILTERED CAMPAIGNS ────
+// Default order for both list-planning tables. The decision you still have to act
+// on comes first (Yes → Maybe → No), and within each decision the most
+// cost-efficient list leads, so the top of the table is the shortlist for this
+// week's sends.
+//
+// Lists with no sales yet have no meaningful ECPA (FTD) — cost ÷ 0 — and
+// computeMetrics stores that as 0, which would otherwise float them above every
+// genuinely cheap list. They sort to the end of their own decision group instead,
+// ranked by lead volume.
+const REUSE_RANK = { Yes: 0, Maybe: 1, No: 2 };
+function compareListRows(a, b) {
+  const ra = REUSE_RANK[a.reuse] ?? 3;
+  const rb = REUSE_RANK[b.reuse] ?? 3;
+  if (ra !== rb) return ra - rb;
+  const aScored = a.sales > 0;
+  const bScored = b.sales > 0;
+  if (aScored !== bScored) return aScored ? -1 : 1;
+  if (aScored) return a.cpa - b.cpa;           // ECPA (FTD), cheapest first
+  return (b.leads - a.leads) || (b.sent - a.sent);
+}
+
 function recomputeAggregates() {
   // Group filtered campaigns by country
   const countryGroups = {};
@@ -3004,10 +3026,12 @@ function recomputeAggregates() {
     }
   });
 
-  // Compute metrics for each group
+  // Compute metrics for each group.
+  // No revenue/ROI here: both were derived from a flat, assumed €20 per sale
+  // rather than anything actually reported, so they measured the assumption more
+  // than the campaign. Cost efficiency is expressed by ECPA instead, which uses
+  // only figures that come from the data.
   const computeMetrics = (group) => {
-    group.revenue = group.sales * 20;
-    group.roi = group.cost > 0 ? (group.revenue - group.cost) / group.cost : 0;
     group.ctr = group.sent > 0 ? group.clicks / group.sent : 0;
     group.cpa = group.sales > 0 ? group.cost / group.sales : 0;
     group.ecpa = group.leads > 0 ? group.cost / group.leads : 0;
@@ -3083,11 +3107,11 @@ function recomputeAggregates() {
 
   filteredCountries = Object.values(countryGroups).map(computeMetrics).sort((a,b) => b.ctr - a.ctr);
   filteredBrands = Object.values(brandGroups).map(computeMetrics).sort((a,b) => b.ctr - a.ctr);
-  filteredLists = Object.values(listGroups).map(computeMetrics).sort((a,b) => b.roi - a.roi);
+  filteredLists = Object.values(listGroups).map(computeMetrics);
   // Split strictly by type — Clicker/retargeting segments are a fundamentally different
   // audience from main lists and must never be aggregated or displayed together.
-  filteredListsMain = filteredLists.filter(l => !l.isClicker).sort((a,b) => b.sales - a.sales);
-  filteredListsClickers = filteredLists.filter(l => l.isClicker).sort((a,b) => b.sales - a.sales);
+  filteredListsMain = filteredLists.filter(l => !l.isClicker).sort(compareListRows);
+  filteredListsClickers = filteredLists.filter(l => l.isClicker).sort(compareListRows);
 }
 
 // ── COST BREAKDOWN TABLE ───────────────────

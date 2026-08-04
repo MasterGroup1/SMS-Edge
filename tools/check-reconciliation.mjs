@@ -139,6 +139,29 @@ console.log('\nSupabase writes are error-checked:');
   }
 }
 
+// ── 5. No metric may be derived from an assumed revenue-per-sale ────────────
+// ROI and "N profitable" were both computed as sales × a flat €20, so they
+// reported the assumption rather than anything measured. Alex asked for ROI to
+// go; the same constant must not reappear behind a different label.
+console.log('\nNo assumed-revenue metrics:');
+{
+  const banned = [
+    [/group\.revenue\s*=/, 'group.revenue assigned in aggregate metrics'],
+    [/group\.roi\s*=/, 'group.roi assigned in aggregate metrics'],
+    [/\.sort\(\s*\(\s*a\s*,\s*b\s*\)\s*=>\s*b\.roi\s*-\s*a\.roi\s*\)/, 'list table sorted by ROI'],
+    [/kpi-camps-sub'\)\.innerText\s*=\s*profitable/, '"N profitable" KPI subtitle'],
+  ];
+  let found = 0;
+  for (const [re, label] of banned) {
+    const m = src.match(re);
+    if (m) {
+      found++;
+      fail(`${label} (index.html:${src.slice(0, m.index).split('\n').length})`);
+    }
+  }
+  if (!found) pass('no ROI / revenue-per-sale / profitable-count metrics');
+}
+
 console.log(
   failures === 0
     ? '\n[32mAll reconciliation checks passed.[0m\n'
