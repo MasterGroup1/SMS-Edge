@@ -1837,6 +1837,40 @@ function scheduleFromList(list, brand, country) {
   document.getElementById('plannerDateInput').focus();
 }
 
+// Editing a "When Used #" date directly in the Master List Planner creates,
+// moves, or removes a planned send — the same underlying planned_sends record
+// the Planner tab reads, so the two stay in sync with no extra step.
+async function onWhenUsedChange(input) {
+  const list = input.dataset.list;
+  const id = input.dataset.id;
+  const newDate = input.value;
+
+  if (!newDate) {
+    if (id) {
+      plannedSends = plannedSends.filter(p => p._id !== id);
+      if (sb) await sb.from('planned_sends').delete().eq('id', id);
+    }
+  } else if (id) {
+    const plan = plannedSends.find(p => p._id === id);
+    if (plan) {
+      plan.planned_date = newDate;
+      await syncPlannedSend(id);
+    }
+  } else {
+    const newPlan = {
+      _id: crypto.randomUUID(), planned_date: newDate, list, brand: '', country: '',
+      status: 'Planned', notes: '', created_at: new Date().toISOString()
+    };
+    plannedSends.push(newPlan);
+    await syncPlannedSend(newPlan._id);
+  }
+
+  recomputeAggregates();
+  refreshListRows(list);
+  renderPlannerTable();
+  renderPlannerCalendar();
+}
+
 function switchPlannerSubtab(id) {
   document.querySelectorAll('.planner-subtab').forEach(el => el.style.display = 'none');
   document.querySelectorAll('[data-ptab]').forEach(el => el.classList.remove('active'));
@@ -2063,6 +2097,14 @@ function refreshListRows(list) {
     if (dateInput) dateInput.value = combo.decisionDate || '';
     const sizeInput = row.querySelector('.list-size-input');
     if (sizeInput) sizeInput.value = combo.listSize || '';
+    // Re-sync all 3 "When Used" slots — an edit can shift which plan lands
+    // in which slot once the list is re-sorted by date.
+    row.querySelectorAll('.when-used-input').forEach(inp => {
+      const slot = Number(inp.dataset.slot);
+      const plan = combo.nextPlanned[slot];
+      inp.value = plan ? plan.planned_date : '';
+      inp.dataset.id = plan ? plan._id : '';
+    });
   });
 }
 
@@ -2961,10 +3003,11 @@ function recomputeAggregates() {
       group.listSize = listSizes[group.list] || '';
 
       // Next up to 3 upcoming planned sends for this list, from the Planner
+      // Full plan objects (not just dates) so each "When Used" slot can be
+      // edited in place and know which planned_sends record it maps to.
       group.nextPlanned = plannedSends
         .filter(p => p.list === group.list && p.status === 'Planned' && p.planned_date)
-        .map(p => p.planned_date)
-        .sort()
+        .sort((a, b) => a.planned_date.localeCompare(b.planned_date))
         .slice(0, 3);
     }
     return group;
@@ -3146,9 +3189,10 @@ function renderListPlannerTable(tableId, rows, idPrefix) {
       <td class="num" style="color:${ecpa_ftd===0?'#94A3B8':ecpa_ftd<100?'#16A34A':ecpa_ftd<215?'#F59E0B':'#DC2626'};font-weight:600" title="ECPA (FTD) = €${l.cost.toFixed(2)} ÷ ${l.sales} = ${ecpa_ftd>0?'€'+ecpa_ftd.toFixed(2):'no sales'}">${ecpa_ftd>0?fmtC2(ecpa_ftd):'—'}</td>
       <td class="num" style="color:${ecpa_reg===0?'#94A3B8':ecpa_reg<20?'#16A34A':ecpa_reg<50?'#F59E0B':'#DC2626'};font-weight:600" title="ECPA (Reg) = €${l.cost.toFixed(2)} ÷ ${l.leads} = ${ecpa_reg>0?'€'+ecpa_reg.toFixed(2):'no leads'}">${ecpa_reg>0?fmtC2(ecpa_reg):'—'}</td>
       <td style="font-size:11px">${l.last_used || '—'}</td>
-      <td style="font-size:11px">${l.nextPlanned[0] || '—'}</td>
-      <td style="font-size:11px">${l.nextPlanned[1] || '—'}</td>
-      <td style="font-size:11px">${l.nextPlanned[2] || '—'}</td>
+      ${[0,1,2].map(slot => {
+        const plan = l.nextPlanned[slot];
+        return `<td><input type="date" class="when-used-input" data-list="${escAttr(l.list)}" data-slot="${slot}" data-id="${plan ? plan._id : ''}" value="${plan ? plan.planned_date : ''}" onchange="onWhenUsedChange(this)" title="Pick a date to schedule this list's send #${slot+1} — saves straight into the Planner" style="border:1px solid #E2E8F0;border-radius:4px;font-size:11px;padding:2px;width:120px;font-family:inherit"></td>`;
+      }).join('')}
       <td style="white-space:nowrap">
         <select class="ua-select" data-list="${escAttr(l.list)}" onchange="onUseAgainChange(this)" title="AI-suggested unless you manually override it below" style="font-weight:600;color:${l.reuse==='Yes'?'#16A34A':l.reuse==='Maybe'?'#F59E0B':'#DC2626'};border:1px solid #E2E8F0;border-radius:4px;padding:2px 4px;font-size:11px;background:#fff;cursor:pointer">
           <option value="" ${!l.isManual?'selected':''}>${l.autoReuse || 'No'} (AI)</option>
