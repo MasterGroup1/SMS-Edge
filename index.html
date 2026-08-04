@@ -677,22 +677,26 @@ tbody tr:hover{background:#F8FAFC}
         <thead><tr>
           <th onclick="sortTable('listsTable', 0)">List Name</th>
           <th onclick="sortTable('listsTable', 1)">Countries</th>
-          <th onclick="sortTable('listsTable', 2)" class="num" title="Number of campaigns using this list">Campaigns</th>
-          <th onclick="sortTable('listsTable', 3)" class="num" title="Total SMS messages sent">Sent</th>
-          <th onclick="sortTable('listsTable', 4)" class="num" title="Total link clicks">Clicks</th>
-          <th onclick="sortTable('listsTable', 5)" class="num" title="Click-Through Rate = Clicks ÷ Sent × 100">CTR</th>
-          <th onclick="sortTable('listsTable', 6)" class="num" title="Registrations (leads)">Leads</th>
-          <th onclick="sortTable('listsTable', 7)" class="num" title="Click-to-Lead Rate = Leads ÷ Clicks × 100">Cl→Lead</th>
-          <th onclick="sortTable('listsTable', 8)" class="num" title="FTDs (first-time deposits)">Sales</th>
-          <th onclick="sortTable('listsTable', 9)" class="num" title="Lead-to-Sale Rate = Sales ÷ Leads × 100">L→Sale</th>
-          <th onclick="sortTable('listsTable', 10)" class="num" title="Total SMS sending cost">Cost</th>
-          <th onclick="sortTable('listsTable', 11)" class="num" title="ECPA (FTD) = Total Spend ÷ Total Sales — matches main dashboard">ECPA (FTD)</th>
-          <th onclick="sortTable('listsTable', 12)" class="num" title="ECPA (Reg) = Total Spend ÷ Total Leads — matches main dashboard">ECPA (Reg)</th>
-          <th onclick="sortTable('listsTable', 13)" title="Date of most recent campaign using this list">Last Used</th>
-          <th onclick="sortTable('listsTable', 14)" title="Send End Date of the most recent campaign — from the CSV's Send End Date column">Send End Date</th>
-          <th onclick="sortTable('listsTable', 15)" title="Yes = sales with ECPA (FTD) ≤ €280, or proven (>5 sends, ECPA Reg <€280) | Maybe = sales but ECPA >€280, or leads >2 | No = no results. Select Yes/Maybe/No to manually override, or 'auto' to use the computed score.">Use Again?</th>
-          <th onclick="sortTable('listsTable', 16)" title="Specific reasons why this list may not be worth reusing — editable">Reasons Not to Use</th>
-          <th onclick="sortTable('listsTable', 17)" title="Date this Use Again decision was made or last reviewed">Decision Date</th>
+          <th onclick="sortTable('listsTable', 2)" class="num" title="How many times this list has been used">Campaigns</th>
+          <th onclick="sortTable('listsTable', 3)" class="num" title="Full size of the list (total contacts) — manual entry, since sends are often partial">List Size</th>
+          <th onclick="sortTable('listsTable', 4)" class="num" title="Total SMS messages sent">Sent</th>
+          <th onclick="sortTable('listsTable', 5)" class="num" title="Total link clicks">Clicks</th>
+          <th onclick="sortTable('listsTable', 6)" class="num" title="Click-Through Rate = Clicks ÷ Sent × 100">CTR</th>
+          <th onclick="sortTable('listsTable', 7)" class="num" title="Registrations (leads)">Leads</th>
+          <th onclick="sortTable('listsTable', 8)" class="num" title="Click-to-Lead Rate = Leads ÷ Clicks × 100">Cl→Lead</th>
+          <th onclick="sortTable('listsTable', 9)" class="num" title="FTDs (first-time deposits)">Sales</th>
+          <th onclick="sortTable('listsTable', 10)" class="num" title="Lead-to-Sale Rate = Sales ÷ Leads × 100">L→Sale</th>
+          <th onclick="sortTable('listsTable', 11)" class="num" title="Total SMS sending cost">Cost</th>
+          <th onclick="sortTable('listsTable', 12)" class="num" title="Average cost per send = Cost ÷ Campaigns">Avg Cost/Send</th>
+          <th onclick="sortTable('listsTable', 13)" class="num" title="ECPA (FTD) = Total Spend ÷ Total Sales — matches main dashboard">ECPA (FTD)</th>
+          <th onclick="sortTable('listsTable', 14)" class="num" title="ECPA (Reg) = Total Spend ÷ Total Leads — matches main dashboard">ECPA (Reg)</th>
+          <th onclick="sortTable('listsTable', 15)" title="Date of most recent campaign using this list">Last Used</th>
+          <th onclick="sortTable('listsTable', 16)" title="Next scheduled send from the Planner">When Used #1</th>
+          <th onclick="sortTable('listsTable', 17)" title="2nd scheduled send from the Planner">When Used #2</th>
+          <th onclick="sortTable('listsTable', 18)" title="3rd scheduled send from the Planner">When Used #3</th>
+          <th onclick="sortTable('listsTable', 19)" title="Yes = sales with ECPA (FTD) ≤ €280, or proven (>5 sends, ECPA Reg <€280) | Maybe = sales but ECPA >€280, or leads >2 | No = no results. Select Yes/Maybe/No to manually override, or 'auto' to use the AI suggestion.">Send or Not</th>
+          <th onclick="sortTable('listsTable', 20)" title="Specific reasons why this list may not be worth reusing — editable">Why</th>
+          <th onclick="sortTable('listsTable', 21)" title="Date this Send-or-Not decision was made or last reviewed">Status Date</th>
         </tr></thead>
         <tbody id="listsTable-body"></tbody>
       </table>
@@ -715,22 +719,26 @@ tbody tr:hover{background:#F8FAFC}
         <thead><tr>
           <th onclick="sortTable('clickerListsTable', 0)">List Name</th>
           <th onclick="sortTable('clickerListsTable', 1)">Countries</th>
-          <th onclick="sortTable('clickerListsTable', 2)" class="num" title="Number of campaigns using this list">Campaigns</th>
-          <th onclick="sortTable('clickerListsTable', 3)" class="num" title="Total SMS messages sent">Sent</th>
-          <th onclick="sortTable('clickerListsTable', 4)" class="num" title="Total link clicks">Clicks</th>
-          <th onclick="sortTable('clickerListsTable', 5)" class="num" title="Click-Through Rate = Clicks ÷ Sent × 100">CTR</th>
-          <th onclick="sortTable('clickerListsTable', 6)" class="num" title="Registrations (leads)">Leads</th>
-          <th onclick="sortTable('clickerListsTable', 7)" class="num" title="Click-to-Lead Rate = Leads ÷ Clicks × 100">Cl→Lead</th>
-          <th onclick="sortTable('clickerListsTable', 8)" class="num" title="FTDs (first-time deposits)">Sales</th>
-          <th onclick="sortTable('clickerListsTable', 9)" class="num" title="Lead-to-Sale Rate = Sales ÷ Leads × 100">L→Sale</th>
-          <th onclick="sortTable('clickerListsTable', 10)" class="num" title="Total SMS sending cost">Cost</th>
-          <th onclick="sortTable('clickerListsTable', 11)" class="num" title="ECPA (FTD) = Total Spend ÷ Total Sales — matches main dashboard">ECPA (FTD)</th>
-          <th onclick="sortTable('clickerListsTable', 12)" class="num" title="ECPA (Reg) = Total Spend ÷ Total Leads — matches main dashboard">ECPA (Reg)</th>
-          <th onclick="sortTable('clickerListsTable', 13)" title="Date of most recent campaign using this list">Last Used</th>
-          <th onclick="sortTable('clickerListsTable', 14)" title="Send End Date of the most recent campaign — from the CSV's Send End Date column">Send End Date</th>
-          <th onclick="sortTable('clickerListsTable', 15)" title="Yes = sales with ECPA (FTD) ≤ €280, or proven (>5 sends, ECPA Reg <€280) | Maybe = sales but ECPA >€280, or leads >2 | No = no results. Select Yes/Maybe/No to manually override, or 'auto' to use the computed score.">Use Again?</th>
-          <th onclick="sortTable('clickerListsTable', 16)" title="Specific reasons why this list may not be worth reusing — editable">Reasons Not to Use</th>
-          <th onclick="sortTable('clickerListsTable', 17)" title="Date this Use Again decision was made or last reviewed">Decision Date</th>
+          <th onclick="sortTable('clickerListsTable', 2)" class="num" title="How many times this list has been used">Campaigns</th>
+          <th onclick="sortTable('clickerListsTable', 3)" class="num" title="Full size of the list (total contacts) — manual entry, since sends are often partial">List Size</th>
+          <th onclick="sortTable('clickerListsTable', 4)" class="num" title="Total SMS messages sent">Sent</th>
+          <th onclick="sortTable('clickerListsTable', 5)" class="num" title="Total link clicks">Clicks</th>
+          <th onclick="sortTable('clickerListsTable', 6)" class="num" title="Click-Through Rate = Clicks ÷ Sent × 100">CTR</th>
+          <th onclick="sortTable('clickerListsTable', 7)" class="num" title="Registrations (leads)">Leads</th>
+          <th onclick="sortTable('clickerListsTable', 8)" class="num" title="Click-to-Lead Rate = Leads ÷ Clicks × 100">Cl→Lead</th>
+          <th onclick="sortTable('clickerListsTable', 9)" class="num" title="FTDs (first-time deposits)">Sales</th>
+          <th onclick="sortTable('clickerListsTable', 10)" class="num" title="Lead-to-Sale Rate = Sales ÷ Leads × 100">L→Sale</th>
+          <th onclick="sortTable('clickerListsTable', 11)" class="num" title="Total SMS sending cost">Cost</th>
+          <th onclick="sortTable('clickerListsTable', 12)" class="num" title="Average cost per send = Cost ÷ Campaigns">Avg Cost/Send</th>
+          <th onclick="sortTable('clickerListsTable', 13)" class="num" title="ECPA (FTD) = Total Spend ÷ Total Sales — matches main dashboard">ECPA (FTD)</th>
+          <th onclick="sortTable('clickerListsTable', 14)" class="num" title="ECPA (Reg) = Total Spend ÷ Total Leads — matches main dashboard">ECPA (Reg)</th>
+          <th onclick="sortTable('clickerListsTable', 15)" title="Date of most recent campaign using this list">Last Used</th>
+          <th onclick="sortTable('clickerListsTable', 16)" title="Next scheduled send from the Planner">When Used #1</th>
+          <th onclick="sortTable('clickerListsTable', 17)" title="2nd scheduled send from the Planner">When Used #2</th>
+          <th onclick="sortTable('clickerListsTable', 18)" title="3rd scheduled send from the Planner">When Used #3</th>
+          <th onclick="sortTable('clickerListsTable', 19)" title="Yes = sales with ECPA (FTD) ≤ €280, or proven (>5 sends, ECPA Reg <€280) | Maybe = sales but ECPA >€280, or leads >2 | No = no results. Select Yes/Maybe/No to manually override, or 'auto' to use the AI suggestion.">Send or Not</th>
+          <th onclick="sortTable('clickerListsTable', 20)" title="Specific reasons why this list may not be worth reusing — editable">Why</th>
+          <th onclick="sortTable('clickerListsTable', 21)" title="Date this Send-or-Not decision was made or last reviewed">Status Date</th>
         </tr></thead>
         <tbody id="clickerListsTable-body"></tbody>
       </table>
@@ -1682,11 +1690,12 @@ async function initSupabase() {
   setDbStatus('connecting', 'Connecting…');
   try {
     sb = supabase.createClient(SB_URL, SB_KEY);
-    const [{ data: dbCamps, error: campErr }, { data: dbContent, error: contErr }, { data: dbDecisions, error: decErr }, { data: dbPlans, error: planErr }] = await Promise.all([
+    const [{ data: dbCamps, error: campErr }, { data: dbContent, error: contErr }, { data: dbDecisions, error: decErr }, { data: dbPlans, error: planErr }, { data: dbSizes, error: sizeErr }] = await Promise.all([
       fetchAllCampaigns(),
       sb.from('content_rows').select('*').order('sort_order'),
       sb.from('list_decisions').select('*'),
-      sb.from('planned_sends').select('*').order('planned_date')
+      sb.from('planned_sends').select('*').order('planned_date'),
+      sb.from('list_sizes').select('*')
     ]);
     if (!planErr && dbPlans) {
       plannedSends = dbPlans.map(p => ({
@@ -1698,6 +1707,10 @@ async function initSupabase() {
     if (!decErr && dbDecisions) {
       listDecisions = {};
       dbDecisions.forEach(d => { listDecisions[d.list] = d; });
+    }
+    if (!sizeErr && dbSizes) {
+      listSizes = {};
+      dbSizes.forEach(s => { listSizes[s.list] = Number(s.size) || 0; });
     }
     if (!campErr && dbCamps && dbCamps.length > 0) {
       campaigns.length = 0;
@@ -2002,6 +2015,16 @@ async function saveListDecision(list, useAgain, reason, decisionDate) {
   refreshListRows(list);
 }
 
+// Full list size — separate table from list_decisions so clearing a
+// Send-or-Not decision (which deletes its list_decisions row) never wipes it.
+async function updateListSize(list, size) {
+  const n = Number(size) || 0;
+  listSizes[list] = n;
+  recomputeAggregates();
+  refreshListRows(list);
+  if (sb) await sb.from('list_sizes').upsert({ list, size: n }, { onConflict: 'list' });
+}
+
 async function clearListDecision(list) {
   if (!sb) { alert('Not connected to Supabase — decision not cleared'); return; }
   await sb.from('list_decisions').delete().eq('list', list);
@@ -2038,6 +2061,8 @@ function refreshListRows(list) {
     }
     const dateInput = row.querySelector('.decision-date-input');
     if (dateInput) dateInput.value = combo.decisionDate || '';
+    const sizeInput = row.querySelector('.list-size-input');
+    if (sizeInput) sizeInput.value = combo.listSize || '';
   });
 }
 
@@ -2383,6 +2408,7 @@ let filteredLists = [...lists];
 let filteredListsMain = []; // per-list rows for real send lists (Master List Planner) — never mixed with Clicker rows
 let filteredListsClickers = []; // per-list rows for Clicker/retargeting segments only
 let listDecisions = {}; // manual Use Again overrides, keyed by normalized list name — see recomputeAggregates()
+let listSizes = {}; // manual full list size (contacts), keyed by normalized list name — sends are often partial, so this can't be derived from Sent
 let plannedSends = []; // Planner tab: scheduled + historical sends, backed by the planned_sends table
 
 // Questions state
@@ -2929,6 +2955,17 @@ function recomputeAggregates() {
         group.decisionDate = '';
         group.isManual = false;
       }
+      // Full list size is manual-only — sends are often partial, so it can't
+      // be derived from any Sent figure. Stored separately from list_decisions
+      // so clearing a Send-or-Not decision never wipes it out.
+      group.listSize = listSizes[group.list] || '';
+
+      // Next up to 3 upcoming planned sends for this list, from the Planner
+      group.nextPlanned = plannedSends
+        .filter(p => p.list === group.list && p.status === 'Planned' && p.planned_date)
+        .map(p => p.planned_date)
+        .sort()
+        .slice(0, 3);
     }
     return group;
   };
@@ -3031,7 +3068,7 @@ function renderBrandsTable() {
   attachColumnFilters('brandsTable');
 }
 
-const LIST_PLANNER_COLS = 18; // total columns in Master List Planner / Clicker Lists tables
+const LIST_PLANNER_COLS = 22; // total columns in Master List Planner / Clicker Lists tables
 
 function renderListsTable() {
   renderListPlannerTable('listsTable', filteredListsMain, 'list');
@@ -3094,6 +3131,9 @@ function renderListPlannerTable(tableId, rows, idPrefix) {
       </td>
       <td style="font-size:11px;color:#64748B" title="${l.countries}">${l.countries}</td>
       <td class="num" title="${l.camps} campaign(s) used this list">${fmtN(l.camps)}</td>
+      <td class="num">
+        <input type="number" min="0" class="list-size-input" data-list="${escAttr(l.list)}" value="${l.listSize || ''}" placeholder="—" onchange="updateListSize('${escAttr(l.list)}', this.value)" title="Full size of the list — manual entry, since sends are often partial" style="border:1px solid #E2E8F0;border-radius:4px;font-size:11px;padding:2px 4px;width:70px;text-align:right;font-family:inherit">
+      </td>
       <td class="num" title="Total sent across all campaigns">${fmtN(l.sent)}</td>
       <td class="num" title="Total clicks">${fmtN(l.clicks)}</td>
       <td class="num" title="CTR = ${fmtN(l.clicks)} ÷ ${fmtN(l.sent)} = ${(l.ctr*100).toFixed(2)}%">${(l.ctr*100).toFixed(2)}%</td>
@@ -3102,10 +3142,13 @@ function renderListPlannerTable(tableId, rows, idPrefix) {
       <td class="num" title="Total sales">${fmtN(l.sales)}</td>
       <td class="num" title="L→Sale = ${l.sales} ÷ ${l.leads} = ${(l.lead_to_sale*100).toFixed(1)}%">${(l.lead_to_sale*100).toFixed(1)}%</td>
       <td class="num" title="Total cost">${fmtC(l.cost)}</td>
+      <td class="num" title="Avg cost per send = €${l.cost.toFixed(2)} ÷ ${l.camps} = €${l.cost_per_camp.toFixed(2)}">${fmtC2(l.cost_per_camp)}</td>
       <td class="num" style="color:${ecpa_ftd===0?'#94A3B8':ecpa_ftd<100?'#16A34A':ecpa_ftd<215?'#F59E0B':'#DC2626'};font-weight:600" title="ECPA (FTD) = €${l.cost.toFixed(2)} ÷ ${l.sales} = ${ecpa_ftd>0?'€'+ecpa_ftd.toFixed(2):'no sales'}">${ecpa_ftd>0?fmtC2(ecpa_ftd):'—'}</td>
       <td class="num" style="color:${ecpa_reg===0?'#94A3B8':ecpa_reg<20?'#16A34A':ecpa_reg<50?'#F59E0B':'#DC2626'};font-weight:600" title="ECPA (Reg) = €${l.cost.toFixed(2)} ÷ ${l.leads} = ${ecpa_reg>0?'€'+ecpa_reg.toFixed(2):'no leads'}">${ecpa_reg>0?fmtC2(ecpa_reg):'—'}</td>
       <td style="font-size:11px">${l.last_used || '—'}</td>
-      <td style="font-size:11px">${l.last_send_end || '—'}</td>
+      <td style="font-size:11px">${l.nextPlanned[0] || '—'}</td>
+      <td style="font-size:11px">${l.nextPlanned[1] || '—'}</td>
+      <td style="font-size:11px">${l.nextPlanned[2] || '—'}</td>
       <td style="white-space:nowrap">
         <select class="ua-select" data-list="${escAttr(l.list)}" onchange="onUseAgainChange(this)" title="AI-suggested unless you manually override it below" style="font-weight:600;color:${l.reuse==='Yes'?'#16A34A':l.reuse==='Maybe'?'#F59E0B':'#DC2626'};border:1px solid #E2E8F0;border-radius:4px;padding:2px 4px;font-size:11px;background:#fff;cursor:pointer">
           <option value="" ${!l.isManual?'selected':''}>${l.autoReuse || 'No'} (AI)</option>
@@ -3120,7 +3163,7 @@ function renderListPlannerTable(tableId, rows, idPrefix) {
         <input type="text" class="reason-input" data-list="${escAttr(l.list)}" data-orig="${escAttr(l.reason||'')}" value="${escAttr(l.reason||'')}" onblur="onReasonBlur(this)" title="${escAttr(l.reason||'—')}" style="border:1px solid transparent;background:transparent;font-size:11px;width:200px;color:${l.reason&&l.reason!=='—'?'#DC2626':'#94A3B8'};font-family:inherit">
       </td>
       <td style="font-size:11px">
-        <input type="date" class="decision-date-input" data-list="${escAttr(l.list)}" value="${l.decisionDate||''}" onchange="onDecisionDateChange(this)" title="Decision date" style="border:1px solid #E2E8F0;border-radius:4px;font-size:11px;padding:2px;width:120px;font-family:inherit">
+        <input type="date" class="decision-date-input" data-list="${escAttr(l.list)}" value="${l.decisionDate||''}" onchange="onDecisionDateChange(this)" title="Status date" style="border:1px solid #E2E8F0;border-radius:4px;font-size:11px;padding:2px;width:120px;font-family:inherit">
       </td>
     </tr>`;
 
@@ -3149,7 +3192,7 @@ function renderListPlannerTable(tableId, rows, idPrefix) {
     return summaryRow + detailRow;
   }).join('');
 
-  const cols = ['List', 'Countries', 'Campaigns', 'Sent', 'Clicks', 'CTR', 'Leads', 'Cl→Lead', 'Sales', 'L→Sale', 'Cost', 'ECPA (FTD)', 'ECPA (Reg)', 'Last Used', 'Send End Date', 'Use Again?', 'Reasons Not to Use', 'Decision Date'];
+  const cols = ['List', 'Countries', 'Campaigns', 'List Size', 'Sent', 'Clicks', 'CTR', 'Leads', 'Cl→Lead', 'Sales', 'L→Sale', 'Cost', 'Avg Cost/Send', 'ECPA (FTD)', 'ECPA (Reg)', 'Last Used', 'When Used #1', 'When Used #2', 'When Used #3', 'Send or Not', 'Why', 'Status Date'];
   initColToggle(tableId, cols);
   attachColumnFilters(tableId);
 }
