@@ -1844,17 +1844,22 @@ async function onWhenUsedChange(input) {
   const list = input.dataset.list;
   const id = input.dataset.id;
   const newDate = input.value;
+  let saveError = null;
 
   if (!newDate) {
     if (id) {
       plannedSends = plannedSends.filter(p => p._id !== id);
-      if (sb) await sb.from('planned_sends').delete().eq('id', id);
+      if (sb) {
+        const { error } = await sb.from('planned_sends').delete().eq('id', id);
+        if (error) saveError = error.message;
+      }
     }
   } else if (id) {
     const plan = plannedSends.find(p => p._id === id);
     if (plan) {
       plan.planned_date = newDate;
-      await syncPlannedSend(id);
+      const res = await syncPlannedSend(id);
+      if (!res.ok) saveError = res.error;
     }
   } else {
     const newPlan = {
@@ -1862,13 +1867,21 @@ async function onWhenUsedChange(input) {
       status: 'Planned', notes: '', created_at: new Date().toISOString()
     };
     plannedSends.push(newPlan);
-    await syncPlannedSend(newPlan._id);
+    const res = await syncPlannedSend(newPlan._id);
+    if (!res.ok) saveError = res.error;
   }
 
   recomputeAggregates();
   refreshListRows(list);
   renderPlannerTable();
   renderPlannerCalendar();
+
+  // Surface failures immediately — a date that only "saved" in the browser
+  // tab would otherwise silently disappear the next time the page loads,
+  // which is exactly the bug being fixed here.
+  if (saveError) {
+    alert('This date was NOT saved to the database (it will disappear on refresh): ' + saveError);
+  }
 }
 
 function switchPlannerSubtab(id) {
@@ -2006,35 +2019,46 @@ function addPlannedSend() {
   document.getElementById('plannerNotesInput').value = '';
   renderPlannerTable();
   renderPlannerCalendar();
-  syncPlannedSend(newPlan._id);
+  syncPlannedSend(newPlan._id).then(res => {
+    if (!res.ok) alert('This plan was NOT saved to the database (it will disappear on refresh): ' + res.error);
+  });
 }
 
-function updatePlannedSend(id, field, value) {
+async function updatePlannedSend(id, field, value) {
   const plan = plannedSends.find(p => p._id === id);
   if (!plan) return;
   plan[field] = value;
   renderPlannerTable();
   renderPlannerCalendar();
-  syncPlannedSend(id);
+  const res = await syncPlannedSend(id);
+  if (!res.ok) alert('This change was NOT saved to the database (it will revert on refresh): ' + res.error);
 }
 
-function deletePlannedSend(id) {
+async function deletePlannedSend(id) {
   if (!confirm('Delete this planned send?')) return;
   plannedSends = plannedSends.filter(p => p._id !== id);
   renderPlannerTable();
   renderPlannerCalendar();
-  if (sb) sb.from('planned_sends').delete().eq('id', id);
+  if (sb) {
+    const { error } = await sb.from('planned_sends').delete().eq('id', id);
+    if (error) alert('Removed locally, but the database delete failed (it may reappear on refresh): ' + error.message);
+  }
 }
 
+// Returns {ok, error} instead of swallowing failures — a plan that only
+// "saves" locally would silently vanish on the next reload with no warning,
+// which is exactly what was happening before this returned anything.
 async function syncPlannedSend(id) {
-  if (!sb) return;
+  if (!sb) return { ok: false, error: 'Not connected to the database — this will not be saved.' };
   const p = plannedSends.find(x => x._id === id);
-  if (!p) return;
-  await sb.from('planned_sends').upsert({
+  if (!p) return { ok: false, error: 'Plan not found locally.' };
+  const { error } = await sb.from('planned_sends').upsert({
     id: p._id, planned_date: p.planned_date || null, list: p.list || '',
     brand: p.brand || '', country: p.country || '', status: p.status || 'Planned',
     notes: p.notes || ''
   }, { onConflict: 'id' });
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
 }
 
 // ── LIST DECISIONS (manual Use Again override + audit trail) ──
