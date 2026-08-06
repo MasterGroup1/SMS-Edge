@@ -673,6 +673,7 @@ tbody tr:hover{background:#F8FAFC}
         </div>
       </div>
       <input type="text" class="search" placeholder="Search lists..." onkeyup="filterTable('listsTable')">
+      <div style="overflow-x:auto">
       <table id="listsTable" style="font-size:12px;margin-top:12px">
         <thead><tr>
           <th onclick="sortTable('listsTable', 0)">List Name</th>
@@ -700,6 +701,7 @@ tbody tr:hover{background:#F8FAFC}
         </tr></thead>
         <tbody id="listsTable-body"></tbody>
       </table>
+      </div>
     </div>
 
     <!-- CLICKER LISTS TABLE — kept fully separate from the Master List Planner above.
@@ -715,6 +717,7 @@ tbody tr:hover{background:#F8FAFC}
         </div>
       </div>
       <input type="text" class="search" placeholder="Search Clicker lists..." onkeyup="filterTable('clickerListsTable')">
+      <div style="overflow-x:auto">
       <table id="clickerListsTable" style="font-size:12px;margin-top:12px">
         <thead><tr>
           <th onclick="sortTable('clickerListsTable', 0)">List Name</th>
@@ -742,6 +745,7 @@ tbody tr:hover{background:#F8FAFC}
         </tr></thead>
         <tbody id="clickerListsTable-body"></tbody>
       </table>
+      </div>
     </div>
   </div>
 
