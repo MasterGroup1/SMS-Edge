@@ -1820,7 +1820,7 @@ function renderPlannerTab() {
   }
 
   if (!document.getElementById('plannerDateInput').value) {
-    document.getElementById('plannerDateInput').value = new Date().toISOString().slice(0, 10);
+    document.getElementById('plannerDateInput').value = todayLocalStr();
   }
 
   renderPlannerTable();
@@ -1904,6 +1904,17 @@ function calendarNav(delta) {
   renderPlannerCalendar();
 }
 
+// Local-calendar-day YYYY-MM-DD, built from getFullYear/getMonth/getDate
+// (all local-timezone) — never via toISOString(), which converts to UTC
+// first and silently shifts the date for anyone not on UTC (e.g. a user on
+// UTC+2 picking "the 6th" would have it stored/rendered as the 5th/7th).
+function localDateStr(d) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function todayLocalStr() {
+  return localDateStr(new Date());
+}
+
 function renderPlannerCalendar() {
   const grid = document.getElementById('calendarGrid');
   if (!grid) return;
@@ -1924,7 +1935,7 @@ function renderPlannerCalendar() {
   const firstOfMonth = new Date(year, month, 1);
   const startWeekday = firstOfMonth.getDay(); // 0=Sun
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = todayLocalStr();
 
   const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   let html = '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:#E2E8F0;border:1px solid #E2E8F0;border-radius:8px;overflow:hidden">';
@@ -1937,7 +1948,7 @@ function renderPlannerCalendar() {
     const dayNum = i - startWeekday + 1;
     const inMonth = dayNum >= 1 && dayNum <= daysInMonth;
     const cellDate = new Date(year, month, dayNum);
-    const dateStr = inMonth ? cellDate.toISOString().slice(0, 10) : '';
+    const dateStr = inMonth ? localDateStr(cellDate) : '';
     const plans = inMonth ? (plansByDate[dateStr] || []) : [];
     const isToday = dateStr === todayStr;
 
@@ -1966,7 +1977,7 @@ function renderPlannerTable() {
   const statusFilter = document.getElementById('plannerStatusFilter')?.value || 'Upcoming';
   const brandFilter = document.getElementById('plannerBrandFilter')?.value || '';
   const search = (document.getElementById('plannerSearch')?.value || '').toLowerCase();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocalStr();
 
   let rows = plannedSends.slice();
   if (statusFilter === 'Upcoming') {
@@ -2105,7 +2116,7 @@ async function seedNZAugustPlans() {
 // ── LIST DECISIONS (manual Use Again override + audit trail) ──
 async function saveListDecision(list, useAgain, reason, decisionDate) {
   if (!sb) { alert('Not connected to Supabase — decision not saved'); return; }
-  decisionDate = decisionDate || new Date().toISOString().slice(0, 10);
+  decisionDate = decisionDate || todayLocalStr();
   const row = { list, use_again: useAgain || null, reason: reason || '', decision_date: decisionDate };
   await sb.from('list_decisions').upsert(row, { onConflict: 'list' });
   await sb.from('list_decision_history').insert(row);
@@ -2247,7 +2258,7 @@ function onUseAgainChange(sel) {
   const row = filteredLists.find(l => l.list === list);
   if (val === '') { clearListDecision(list); return; }
   const reason = row ? row.reason : '';
-  const date = (row && row.decisionDate) || new Date().toISOString().slice(0, 10);
+  const date = (row && row.decisionDate) || todayLocalStr();
   saveListDecision(list, val, reason, date);
 }
 
@@ -2256,7 +2267,7 @@ function onReasonBlur(input) {
   const list = input.dataset.list;
   const row = filteredLists.find(l => l.list === list);
   const useAgain = row ? row.reuse : '';
-  const date = (row && row.decisionDate) || new Date().toISOString().slice(0, 10);
+  const date = (row && row.decisionDate) || todayLocalStr();
   saveListDecision(list, useAgain, input.value, date);
 }
 
