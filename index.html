@@ -2173,7 +2173,13 @@ function onDecisionDateChange(input) {
 }
 
 // Fully replaces the database's campaign records with whatever is currently
-// loaded in the dashboard (the baked-in dataset, or a CSV just uploaded).
+// loaded in the dashboard — the live in-memory `campaigns` array, which
+// reflects either a normal page load or a CSV you just uploaded. It is
+// deliberately NOT BAKED_CAMPAIGNS (the file's fixed snapshot as of the last
+// deploy): using that here would silently overwrite/undo any CSV uploaded
+// since, since the upload already saves to the DB on its own via
+// saveCampaignBatch() — this button exists to clean up stale leftover rows
+// a plain upsert wouldn't remove, not to roll back to an old snapshot.
 // IMPORTANT ORDER: upsert the new data FIRST, and only delete now-stale
 // leftover rows AFTER that succeeds. A previous version deleted everything
 // up front, so when saveCampaignBatch failed partway through (e.g. one bad
@@ -2182,29 +2188,37 @@ function onDecisionDateChange(input) {
 // worst case some stale rows are left behind until you click Resync again.
 async function resyncDatabase() {
   if (!sb) { alert('Not connected to Supabase'); return; }
-  // Sync from BAKED_CAMPAIGNS (the file's authoritative dataset), never from
-  // `campaigns` — if the database currently holds a stale/incomplete set (e.g.
-  // from a previous failed resync), initSupabase() has already overwritten the
-  // in-memory `campaigns` with THAT stale data on page load. Syncing from it
-  // again would just re-save the wrong data back to itself and never fix anything.
-  const source = BAKED_CAMPAIGNS;
-  if (!confirm(`This will sync all ${source.length} campaigns from the dashboard's source data to the database (adding/updating as needed, then removing anything no longer present). Continue?`)) return;
+  const source = campaigns;
+  if (!confirm(`This will sync all ${source.length} campaigns currently shown in the dashboard to the database (adding/updating as needed, then removing anything no longer present). Continue?`)) return;
   const btn = document.getElementById('seedBtn');
   btn.disabled = true; btn.textContent = 'Resyncing…';
   try {
     await saveCampaignBatch(source);
 
-    const { data: existingRows, error: fetchErr } = await sb.from('campaigns').select('id').limit(20000);
-    if (fetchErr) throw new Error('Saved all campaigns, but could not check for stale rows: ' + fetchErr.message);
+    // Paginate the existing-IDs fetch too — Supabase's server-side Max Rows
+    // cap applies per request regardless of payload size, so a plain
+    // .limit(20000) can silently come back short on a large table.
+    let existingRows = [];
+    { let offset = 0; const PAGE = 1000;
+      while (true) {
+        const { data, error: fetchErr } = await sb.from('campaigns').select('id').range(offset, offset + PAGE - 1);
+        if (fetchErr) throw new Error('Saved all campaigns, but could not check for stale rows: ' + fetchErr.message);
+        if (!data || data.length === 0) break;
+        existingRows = existingRows.concat(data);
+        if (data.length < PAGE) break;
+        offset += PAGE;
+        if (offset > 100000) break;
+      }
+    }
     const newIds = new Set(source.map(c => c.id));
-    const staleIds = (existingRows || []).map(r => r.id).filter(id => !newIds.has(id));
+    const staleIds = existingRows.map(r => r.id).filter(id => !newIds.has(id));
     for (let i = 0; i < staleIds.length; i += 100) {
       const { error: delErr } = await sb.from('campaigns').delete().in('id', staleIds.slice(i, i + 100));
       if (delErr) throw new Error('Saved all campaigns, but failed removing stale rows: ' + delErr.message);
     }
 
-    campaigns.length = 0;
-    source.forEach(c => campaigns.push(c));
+    // source IS campaigns (same array) now — nothing to re-populate, it's
+    // already showing what was just saved.
     rebuildFilterOptions();
     resetFilters();
 
