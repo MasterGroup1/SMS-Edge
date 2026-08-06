@@ -182,6 +182,13 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:#F4F6FA;c
 }
 .card-title{font-size:14px;font-weight:700;color:#0F172A}
 .card-subtitle{font-size:11px;color:#94A3B8;margin-top:2px}
+.card-collapse-btn{
+  background:transparent;border:none;cursor:pointer;color:#94A3B8;font-size:11px;
+  padding:2px 6px;margin-right:8px;border-radius:4px;font-family:inherit;
+}
+.card-collapse-btn:hover{background:#F1F5F9;color:#334155}
+.card.collapsed{padding-bottom:14px}
+.card.collapsed > *:not(.card-header){display:none}
 .chart-wrap{position:relative;height:260px}
 .chart-wrap-sm{position:relative;height:200px}
 
@@ -3359,7 +3366,13 @@ function renderListPlannerTable(tableId, rows, idPrefix) {
   }).join('');
 
   const cols = ['List', 'Countries', 'Campaigns', 'List Size', 'Sent', 'Clicks', 'CTR', 'Leads', 'Cl→Lead', 'Sales', 'L→Sale', 'Cost', 'Avg Cost/Send', 'ECPA (FTD)', 'ECPA (Reg)', 'Last Used', 'When Used #1', 'When Used #2', 'When Used #3', 'Send or Not', 'Why', 'Status Date'];
-  initColToggle(tableId, cols);
+  const colGroups = [
+    { label: 'Performance', indices: [4, 5, 6, 7, 8, 9, 10] },
+    { label: 'Cost / ECPA', indices: [11, 12, 13, 14] },
+    { label: 'When Used', indices: [16, 17, 18] },
+    { label: 'Decision', indices: [19, 20, 21] }
+  ];
+  initColToggle(tableId, cols, colGroups);
   attachColumnFilters(tableId);
 }
 
@@ -4175,24 +4188,75 @@ function filterTable(tableId) {
   });
 }
 
+// Lets any card/section on any tab be collapsed out of the way — there's a
+// lot of data on this dashboard and not all of it matters for every
+// decision. State persists per-card (keyed by its title) in localStorage.
+function initCollapsibleCards() {
+  document.querySelectorAll('.card').forEach((card, idx) => {
+    const header = card.querySelector(':scope > .card-header');
+    if (!header || header.querySelector('.card-collapse-btn')) return;
+    const titleEl = header.querySelector('.card-title');
+    const key = 'cardCollapsed:' + (titleEl ? titleEl.textContent.trim() : 'card' + idx);
+    const btn = document.createElement('button');
+    btn.className = 'card-collapse-btn';
+    btn.title = 'Collapse/expand this section';
+    btn.type = 'button';
+    btn.textContent = '▾';
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const collapsed = card.classList.toggle('collapsed');
+      btn.textContent = collapsed ? '▸' : '▾';
+      localStorage.setItem(key, collapsed ? '1' : '0');
+    };
+    header.insertBefore(btn, header.firstChild);
+    if (localStorage.getItem(key) === '1') {
+      card.classList.add('collapsed');
+      btn.textContent = '▸';
+    }
+  });
+}
+
 function toggleColDropdown(tableId) {
   const dd = document.getElementById(tableId + '-dropdown');
   dd.classList.toggle('show');
 }
 
-function initColToggle(tableId, cols) {
+function initColToggle(tableId, cols, groups) {
   const dd = document.getElementById(tableId + '-dropdown');
-  dd.innerHTML = cols.map((c, i) => `
+  let html = '';
+  if (groups && groups.length) {
+    html += groups.map(g => `
+      <label class="col-dropdown-item" style="font-weight:700">
+        <input type="checkbox" checked data-group="${g.indices.join(',')}" onchange="toggleColGroup('${tableId}', this)">
+        ${g.label}
+      </label>
+    `).join('');
+    html += '<div style="height:1px;background:#E2E8F0;margin:6px 0"></div>';
+  }
+  html += cols.map((c, i) => `
     <label class="col-dropdown-item">
-      <input type="checkbox" checked onchange="toggleCol('${tableId}', ${i})">
+      <input type="checkbox" checked data-colidx="${i}" onchange="toggleCol('${tableId}', ${i})">
       ${c}
     </label>
   `).join('');
+  dd.innerHTML = html;
+}
+
+// Toggle a whole cluster of related columns at once (e.g. all 3 "When Used"
+// dates, or Cost/ECPA) instead of unchecking each one individually.
+function toggleColGroup(tableId, groupCheckbox) {
+  const indices = groupCheckbox.dataset.group.split(',').map(Number);
+  const show = groupCheckbox.checked;
+  const dd = document.getElementById(`${tableId}-dropdown`);
+  indices.forEach(i => {
+    const cb = dd.querySelector(`input[data-colidx="${i}"]`);
+    if (cb && cb.checked !== show) { cb.checked = show; toggleCol(tableId, i); }
+  });
 }
 
 function toggleCol(tableId, colIdx) {
   const table = document.getElementById(tableId);
-  const chk = table.parentElement.querySelector(`#${tableId}-dropdown label:nth-child(${colIdx+1}) input`).checked;
+  const chk = document.getElementById(`${tableId}-dropdown`).querySelector(`input[data-colidx="${colIdx}"]`).checked;
   Array.from(table.querySelectorAll(`th:nth-child(${colIdx+1}), td:nth-child(${colIdx+1})`)).forEach(el => {
     el.style.display = chk ? '' : 'none';
   });
@@ -4666,6 +4730,7 @@ function initApp() {
   recomputeAggregates();
   updateKPIs();
   updateCostBreakdown();
+  initCollapsibleCards();
   renderQuestionsTable();
   renderContentTable();
   renderDatePresets();
