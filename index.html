@@ -721,7 +721,10 @@ tbody tr:hover{background:#F8FAFC}
     <div class="card">
       <div class="card-header">
         <div class="card-title">Clicker Lists</div>
+        <div style="display:flex;gap:8px">
+        <button class="col-toggle" onclick="deleteJunkClickerLists()" title="Delete legacy general per-country Clicker buckets that don't follow the '&lt;List Name&gt; - Clickers' convention" style="color:#DC2626;border-color:#FCA5A5">🧹 Delete Junk Clicker Lists</button>
         <button class="col-toggle" onclick="toggleColDropdown('clickerListsTable')">⚙ Columns</button>
+        </div>
         <div class="col-dropdown">
           <div class="col-dropdown-content" id="clickerListsTable-dropdown">
             <!-- populated by JS -->
@@ -2049,20 +2052,28 @@ async function backfillClickerSchedule() {
   }
 
   // Clicker lists worth using that aren't tied to any currently-planned Main
-  // list — give them a date too, since it doesn't matter which.
+  // list — give them a date too, since it doesn't matter which. Spread these
+  // across the week (today..+6) by always picking whichever day currently
+  // has the fewest total planned sends, instead of piling them all onto the
+  // same day.
+  const weekDays = [];
+  for (let k = 0; k <= 6; k++) weekDays.push(addDaysStr(today, k));
+  const dayLoad = {};
+  weekDays.forEach(d => { dayLoad[d] = plannedSends.filter(p => p.status === 'Planned' && p.planned_date === d).length; });
+
   for (const cl of filteredListsClickers) {
-    if (usedClickerLists.has(cl.list) || cl.reuse === 'No') continue;
+    if (usedClickerLists.has(cl.list) || cl.reuse === 'No' || !cl.list.endsWith(' - Clickers')) continue;
     const hasAnyUpcoming = plannedSends.some(p => p.list === cl.list && p.status === 'Planned' && p.planned_date && p.planned_date >= today);
     if (hasAnyUpcoming) continue;
 
-    const finalDate = addDaysStr(today, 1);
+    const finalDate = weekDays.reduce((min, d) => dayLoad[d] < dayLoad[min] ? d : min, weekDays[0]);
     const newPlan = {
       _id: crypto.randomUUID(), planned_date: finalDate, list: cl.list, brand: '', country: '',
       status: 'Planned', notes: AUTO_CLICKER_NOTE, created_at: new Date().toISOString()
     };
     plannedSends.push(newPlan);
     const res = await syncPlannedSend(newPlan._id);
-    if (res.ok) { addedCount++; listsTouched.add(cl.list); }
+    if (res.ok) { addedCount++; listsTouched.add(cl.list); dayLoad[finalDate]++; }
     else { plannedSends = plannedSends.filter(p => p._id !== newPlan._id); failedCount++; }
   }
 
@@ -2396,15 +2407,16 @@ async function updateListSize(list, size) {
   if (sb) await sb.from('list_sizes').upsert({ list, size: n }, { onConflict: 'list' });
 }
 
-async function deleteList(list) {
+// Core delete, no confirm/alert — shared by the single-list delete button and
+// the bulk junk-Clicker cleanup so the latter doesn't pop a dialog per list.
+async function deleteListCore(list) {
   const campsForList = campaigns.filter(c => c.list === list);
-  if (!campsForList.length) { alert('No campaigns found for this list — nothing to delete.'); return; }
-  if (!confirm(`Delete "${list}"? This will permanently remove ${campsForList.length} campaign(s), plus its list size, decision history, and any planned sends. This cannot be undone.`)) return;
+  if (!campsForList.length) return { ok: false, count: 0, error: 'No campaigns found for this list.' };
 
   const ids = new Set(campsForList.map(c => c.id));
   if (sb) {
     const { error: delCampErr } = await sb.from('campaigns').delete().in('id', [...ids]);
-    if (delCampErr) { alert('Failed to delete campaigns: ' + delCampErr.message); return; }
+    if (delCampErr) return { ok: false, count: 0, error: delCampErr.message };
     await sb.from('list_sizes').delete().eq('list', list);
     await sb.from('list_decisions').delete().eq('list', list);
     await sb.from('planned_sends').delete().eq('list', list);
@@ -2418,13 +2430,51 @@ async function deleteList(list) {
   delete listDecisions[list];
   plannedSends = plannedSends.filter(p => p.list !== list);
 
+  return { ok: true, count: ids.size };
+}
+
+async function deleteList(list) {
+  const campsForList = campaigns.filter(c => c.list === list);
+  if (!campsForList.length) { alert('No campaigns found for this list — nothing to delete.'); return; }
+  if (!confirm(`Delete "${list}"? This will permanently remove ${campsForList.length} campaign(s), plus its list size, decision history, and any planned sends. This cannot be undone.`)) return;
+
+  const res = await deleteListCore(list);
+  if (!res.ok) { alert('Failed to delete: ' + res.error); return; }
+
   recomputeAggregates();
   updateKPIs();
   rebuildFilterOptions();
   renderListsTable();
   renderClickerListsTable();
   if (document.getElementById('planner')?.classList.contains('active')) renderPlannerTab();
-  alert(`Deleted "${list}" (${ids.size} campaign(s)).`);
+  alert(`Deleted "${list}" (${res.count} campaign(s)).`);
+}
+
+// Legacy general per-country Clicker buckets (e.g. "IT Clicked", "DE Clicked")
+// predate today's specific-batch "<List Name> - Clickers" convention and
+// shouldn't exist as their own lists anymore. Anything whose name doesn't
+// follow that convention (after normalizeListName's typo fixes, e.g.
+// singular "- Clicker") is deleted outright.
+async function deleteJunkClickerLists() {
+  const junk = filteredListsClickers.filter(l => !l.list.endsWith(' - Clickers'));
+  if (!junk.length) { alert('No junk Clicker lists found — every Clicker list follows the "<List Name> - Clickers" convention.'); return; }
+  if (!confirm(`Delete ${junk.length} legacy Clicker list(s) that don't follow the "<List Name> - Clickers" naming convention?\n\n` +
+    junk.map(l => `• ${l.list} (${l.camps} campaign(s))`).join('\n') +
+    `\n\nThis permanently removes their campaigns. This cannot be undone.`)) return;
+
+  let deleted = 0, failed = 0;
+  for (const l of junk) {
+    const res = await deleteListCore(l.list);
+    if (res.ok) deleted++; else failed++;
+  }
+
+  recomputeAggregates();
+  updateKPIs();
+  rebuildFilterOptions();
+  renderListsTable();
+  renderClickerListsTable();
+  if (document.getElementById('planner')?.classList.contains('active')) renderPlannerTab();
+  alert(`Deleted ${deleted} junk Clicker list(s)` + (failed ? `, ${failed} failed.` : '.'));
 }
 
 async function clearListDecision(list) {
@@ -4982,6 +5032,7 @@ function normalizeListName(name) {
     .replace(/Roy_Boy/gi, 'Roy Boy')  // "Roy_Boy_..." → "Roy Boy_..."
     .replace(/ _/g, '_')             // "Artium _15052026" → "Artium_15052026"
     .replace(/_ /g, '_')             // "IT_ 30032026" → "IT_30032026"
+    .replace(/ - Clicker$/i, ' - Clickers') // singular typo → plural, matches the real suffix convention
     .replace(/\s+/g, ' ')            // collapse multiple spaces
     .trim();
 }
