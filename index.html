@@ -1494,6 +1494,32 @@ tbody tr:hover{background:#F8FAFC}
         <div class="card-title">Active Routes — Recommended by Country</div>
       </div>
       <p style="font-size:12px;color:#64748B;margin-bottom:12px">Routes currently performing well. <strong style="color:#16A34A">Direct</strong> = direct carrier connection. <strong style="color:#3B82F6">SIM</strong> = SIM-based routing.</p>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin-bottom:14px;padding:12px;background:#F8FAFC;border-radius:8px">
+        <div>
+          <label style="display:block;font-size:11px;font-weight:600;color:#64748B;margin-bottom:4px">Country</label>
+          <input id="routeCountryInput" type="text" placeholder="e.g. Italy" style="border:1px solid #E2E8F0;border-radius:6px;padding:6px 8px;font-size:12px;width:140px;font-family:inherit">
+        </div>
+        <div>
+          <label style="display:block;font-size:11px;font-weight:600;color:#64748B;margin-bottom:4px">Code</label>
+          <input id="routeCodeInput" type="text" placeholder="IT" maxlength="4" style="border:1px solid #E2E8F0;border-radius:6px;padding:6px 8px;font-size:12px;width:60px;font-family:inherit;text-transform:uppercase">
+        </div>
+        <div>
+          <label style="display:block;font-size:11px;font-weight:600;color:#64748B;margin-bottom:4px">Type</label>
+          <select id="routeTypeInput" style="border:1px solid #E2E8F0;border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit">
+            <option value="Direct">Direct</option>
+            <option value="SIM">SIM</option>
+          </select>
+        </div>
+        <div>
+          <label style="display:block;font-size:11px;font-weight:600;color:#64748B;margin-bottom:4px">Route Numbers</label>
+          <input id="routeNumbersInput" type="text" placeholder="e.g. 423, 218" style="border:1px solid #E2E8F0;border-radius:6px;padding:6px 8px;font-size:12px;width:160px;font-family:inherit">
+        </div>
+        <div>
+          <label style="display:block;font-size:11px;font-weight:600;color:#64748B;margin-bottom:4px">Notes</label>
+          <input id="routeNotesInput" type="text" placeholder="optional" style="border:1px solid #E2E8F0;border-radius:6px;padding:6px 8px;font-size:12px;width:180px;font-family:inherit">
+        </div>
+        <button class="col-toggle" onclick="addActiveRoute()" style="background:#3B82F6;color:#fff;border-color:#3B82F6">+ Add Route</button>
+      </div>
       <input type="text" class="search" placeholder="Search routes by country or route number..." onkeyup="filterTable('activeRoutesTable')" style="margin-bottom:8px">
       <table id="activeRoutesTable" style="font-size:12px;margin-top:8px">
         <thead><tr>
@@ -1502,6 +1528,7 @@ tbody tr:hover{background:#F8FAFC}
           <th onclick="sortTable('activeRoutesTable',2)">Type</th>
           <th onclick="sortTable('activeRoutesTable',3)">Route Numbers</th>
           <th onclick="sortTable('activeRoutesTable',4)">Notes</th>
+          <th></th>
         </tr></thead>
         <tbody id="activeRoutesTable-body"></tbody>
       </table>
@@ -1701,12 +1728,13 @@ async function initSupabase() {
   setDbStatus('connecting', 'Connecting…');
   try {
     sb = supabase.createClient(SB_URL, SB_KEY);
-    const [{ data: dbCamps, error: campErr }, { data: dbContent, error: contErr }, { data: dbDecisions, error: decErr }, { data: dbPlans, error: planErr }, { data: dbSizes, error: sizeErr }] = await Promise.all([
+    const [{ data: dbCamps, error: campErr }, { data: dbContent, error: contErr }, { data: dbDecisions, error: decErr }, { data: dbPlans, error: planErr }, { data: dbSizes, error: sizeErr }, { data: dbRoutes, error: routesErr }] = await Promise.all([
       fetchAllCampaigns(),
       sb.from('content_rows').select('*').order('sort_order'),
       sb.from('list_decisions').select('*'),
       sb.from('planned_sends').select('*').order('planned_date'),
-      sb.from('list_sizes').select('*')
+      sb.from('list_sizes').select('*'),
+      sb.from('active_routes').select('*')
     ]);
     if (!planErr && dbPlans) {
       plannedSends = dbPlans.map(p => ({
@@ -1722,6 +1750,18 @@ async function initSupabase() {
     if (!sizeErr && dbSizes) {
       listSizes = {};
       dbSizes.forEach(s => { listSizes[s.list] = Number(s.size) || 0; });
+    }
+    if (!routesErr && dbRoutes) {
+      if (dbRoutes.length > 0) {
+        activeRoutes = dbRoutes.map(r => ({
+          _id: r.id, country: r.country || '', code: r.code || '',
+          type: r.type || '', routes: r.routes || '', notes: r.notes || ''
+        }));
+      } else {
+        // Table exists but is empty (first run) — seed it once with the
+        // baked-in starter list so Supabase becomes authoritative from here on.
+        saveActiveRoutesBatch(activeRoutes);
+      }
     }
     if (!campErr && dbCamps && dbCamps.length > 0) {
       campaigns.length = 0;
@@ -1969,7 +2009,22 @@ function renderPlannerCalendar() {
       return `<div title="${escAttr(p.list)} — ${escAttr(p.brand||'')} — ${escAttr(p.country||'')} — ${p.status}${p.notes ? ' — ' + escAttr(p.notes) : ''}" style="background:${color};color:#fff;border-radius:3px;padding:1px 4px;font-size:10px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer" onclick="switchPlannerSubtab('planner-table');document.getElementById('plannerSearch').value='${escAttr(p.list)}';onPlannerFilterChange();">${escAttr(label)}</div>`;
     }).join('');
 
-    html += `<div style="background:#fff;min-height:80px;padding:4px;${isToday?'box-shadow:inset 0 0 0 2px #0EA5E9;':''}${inMonth?'':'opacity:.35'}">
+    // Estimated cost for the day: each planned list's historical average
+    // cost per send (cost_per_camp — itself driven by that list's average
+    // sent volume and cost), summed across every list chosen for that day.
+    let dayTitle = '';
+    if (plans.length) {
+      let total = 0;
+      const lines = plans.map(p => {
+        const lg = filteredLists.find(l => l.list === p.list);
+        const cost = lg ? lg.cost_per_camp : 0;
+        total += cost;
+        return `${p.list}: ${lg ? fmtC2(cost) : 'no cost data'}`;
+      });
+      dayTitle = `Estimated cost for ${dateStr}: ${fmtC2(total)}\n` + lines.join('\n');
+    }
+
+    html += `<div title="${escAttr(dayTitle)}" style="background:#fff;min-height:80px;padding:4px;${isToday?'box-shadow:inset 0 0 0 2px #0EA5E9;':''}${inMonth?'':'opacity:.35'}">
       <div style="font-size:11px;font-weight:${isToday?'700':'600'};color:${isToday?'#0EA5E9':'#334155'}">${inMonth ? dayNum : ''}</div>
       ${chips}
     </div>`;
@@ -2355,7 +2410,7 @@ const campaigns = [{"id":175588,"name":"NZ_Rollero_22425_SMSEdge","country":"New
 const BAKED_CAMPAIGNS = campaigns.slice(); // immutable snapshot of the authoritative baked-in dataset — used by Resync Data so a stale/broken DB can never overwrite the source of truth on page load
 
 // ── ACTIVE ROUTES (from Rooster Partners schedule) ──────────────
-const activeRoutes = [
+let activeRoutes = [
   {country:'Australia', code:'AU', type:'Direct', routes:'423', notes:''},
   {country:'Australia', code:'AU', type:'SIM', routes:'290, 218', notes:''},
   {country:'Austria', code:'AT', type:'Direct', routes:'218, 136, 400, 137', notes:''},
@@ -2394,6 +2449,7 @@ const activeRoutes = [
   {country:'United Kingdom', code:'UK', type:'SIM', routes:'423', notes:'NEW — works well'},
   {country:'United Kingdom', code:'UK', type:'Direct', routes:'137, 136', notes:''},
 ];
+activeRoutes.forEach(r => { r._id = crypto.randomUUID(); });
 
 // ── FULL ROUTE PRICING (from SMSEdge price list 09.04.2026) ──────
 const fullPricingData = [
@@ -3480,6 +3536,58 @@ function exportQuestionsCSV() {
   a.click();
 }
 
+// ── ACTIVE ROUTES CRUD (routes change constantly, so these are user-editable
+// like the Planner, backed by the active_routes table) ──
+async function syncActiveRoute(id) {
+  if (!sb) return { ok: false, error: 'Not connected to the database — this will not be saved.' };
+  const r = activeRoutes.find(x => x._id === id);
+  if (!r) return { ok: false, error: 'Route not found locally.' };
+  const { error } = await sb.from('active_routes').upsert({
+    id: r._id, country: r.country || '', code: r.code || '', type: r.type || '',
+    routes: r.routes || '', notes: r.notes || ''
+  }, { onConflict: 'id' });
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+async function saveActiveRoutesBatch(routes) {
+  if (!sb || !routes.length) return;
+  const rows = routes.map(r => ({ id: r._id, country: r.country || '', code: r.code || '', type: r.type || '', routes: r.routes || '', notes: r.notes || '' }));
+  await sb.from('active_routes').upsert(rows, { onConflict: 'id' });
+}
+
+async function addActiveRoute() {
+  const country = document.getElementById('routeCountryInput').value.trim();
+  const code = document.getElementById('routeCodeInput').value.trim().toUpperCase();
+  const type = document.getElementById('routeTypeInput').value;
+  const routes = document.getElementById('routeNumbersInput').value.trim();
+  const notes = document.getElementById('routeNotesInput').value.trim();
+  if (!country || !code || !routes) { alert('Country, Code, and Route Numbers are required.'); return; }
+
+  const newRoute = { _id: crypto.randomUUID(), country, code, type, routes, notes };
+  activeRoutes.push(newRoute);
+  const res = await syncActiveRoute(newRoute._id);
+  if (!res.ok) alert('This route was NOT saved to the database (it will disappear on refresh): ' + res.error);
+
+  document.getElementById('routeCountryInput').value = '';
+  document.getElementById('routeCodeInput').value = '';
+  document.getElementById('routeNumbersInput').value = '';
+  document.getElementById('routeNotesInput').value = '';
+  renderRoutesTab();
+}
+
+async function deleteActiveRoute(id) {
+  const r = activeRoutes.find(x => x._id === id);
+  if (!r) return;
+  if (!confirm(`Delete route ${r.country} (${r.code}) ${r.type} — ${r.routes}?`)) return;
+  activeRoutes = activeRoutes.filter(x => x._id !== id);
+  if (sb) {
+    const { error } = await sb.from('active_routes').delete().eq('id', id);
+    if (error) alert('Failed to delete from database: ' + error.message);
+  }
+  renderRoutesTab();
+}
+
 function renderRoutesTab() {
   // Active Routes table
   const tbody1 = document.getElementById('activeRoutesTable-body');
@@ -3490,6 +3598,7 @@ function renderRoutesTab() {
       <td><span style="background:${r.type==='Direct'?'#DCFCE7':'#DBEAFE'};color:${r.type==='Direct'?'#16A34A':'#1D4ED8'};border-radius:4px;padding:2px 6px;font-size:11px;font-weight:700">${r.type}</span></td>
       <td style="font-family:monospace;font-weight:600;color:#1E293B">${r.routes.split(',').map(n=>`<span style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:3px;padding:1px 5px;margin-right:3px;font-size:11px">${n.trim()}</span>`).join('')}</td>
       <td style="color:#64748B;font-size:11px">${r.notes}</td>
+      <td><button onclick="deleteActiveRoute('${r._id}')" title="Delete this route" style="border:none;background:transparent;cursor:pointer;color:#94A3B8;font-size:12px">🗑️</button></td>
     </tr>`).join('');
   }
 
