@@ -1902,6 +1902,47 @@ function scheduleFromList(list, brand, country) {
 // Editing a "When Used #" date directly in the Master List Planner creates,
 // moves, or removes a planned send — the same underlying planned_sends record
 // the Planner tab reads, so the two stay in sync with no extra step.
+// When a Main list's "When Used" date is newly set, auto-schedule its paired
+// Clicker list (same name + " - Clickers") on the nearest day that isn't
+// already a Main send day and isn't already used by the Clicker list itself
+// — so remarketing to clickers never overlaps the original send, and spreads
+// naturally onto the "opposite" days as more Main dates get set through the week.
+async function autoScheduleClickerPair(mainList, newDate) {
+  const clickerName = mainList + ' - Clickers';
+  const clickerGroup = filteredListsClickers.find(l => l.list === clickerName);
+  if (!clickerGroup) return; // no matching Clicker list — nothing to schedule
+
+  const mainDates = new Set(
+    plannedSends.filter(p => p.list === mainList && p.status === 'Planned' && p.planned_date).map(p => p.planned_date)
+  );
+  const clickerPlans = plannedSends.filter(p => p.list === clickerName && p.status === 'Planned' && p.planned_date);
+  if (clickerPlans.length >= 3) return; // all 3 "When Used" slots already full
+  const takenByClicker = new Set(clickerPlans.map(p => p.planned_date));
+
+  let candidate = null;
+  const base = new Date(newDate + 'T00:00:00');
+  for (let offset = 1; offset <= 13; offset++) {
+    const d = new Date(base);
+    d.setDate(d.getDate() + offset);
+    const dStr = localDateStr(d);
+    if (!mainDates.has(dStr) && !takenByClicker.has(dStr)) { candidate = dStr; break; }
+  }
+  if (!candidate) return;
+
+  const newPlan = {
+    _id: crypto.randomUUID(), planned_date: candidate, list: clickerName, brand: '', country: '',
+    status: 'Planned', notes: 'Auto-scheduled opposite its Main list send day', created_at: new Date().toISOString()
+  };
+  plannedSends.push(newPlan);
+  const res = await syncPlannedSend(newPlan._id);
+  if (!res.ok) {
+    plannedSends = plannedSends.filter(p => p._id !== newPlan._id);
+    console.warn('Auto-schedule Clicker date failed to save: ' + res.error);
+  } else {
+    refreshListRows(clickerName);
+  }
+}
+
 async function onWhenUsedChange(input) {
   const list = input.dataset.list;
   const id = input.dataset.id;
@@ -1931,6 +1972,14 @@ async function onWhenUsedChange(input) {
     plannedSends.push(newPlan);
     const res = await syncPlannedSend(newPlan._id);
     if (!res.ok) saveError = res.error;
+  }
+
+  // Setting a Main list's send date auto-schedules its paired Clicker list
+  // (same name + " - Clickers") on a day that's never the same as a Main
+  // send day — see autoScheduleClickerPair(). Only fires from the Main side,
+  // and only for a newly-set date, so it can't loop or fight manual edits.
+  if (!saveError && newDate && !list.endsWith(' - Clickers')) {
+    await autoScheduleClickerPair(list, newDate);
   }
 
   recomputeAggregates();
