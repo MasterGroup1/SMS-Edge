@@ -679,7 +679,12 @@ tbody tr:hover{background:#F8FAFC}
           </div>
         </div>
       </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
       <input type="text" class="search" placeholder="Search lists..." onkeyup="filterTable('listsTable')">
+      <select class="country-filter-select" id="listsTable-countryFilter" onchange="filterTable('listsTable')" style="border:1.5px solid #E2E8F0;border-radius:8px;padding:8px 10px;font-size:12px;font-family:inherit;background:#F8FAFC">
+        <option value="">All Countries</option>
+      </select>
+      </div>
       <div style="overflow-x:auto">
       <table id="listsTable" style="font-size:12px;margin-top:12px">
         <thead><tr>
@@ -723,7 +728,12 @@ tbody tr:hover{background:#F8FAFC}
           </div>
         </div>
       </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
       <input type="text" class="search" placeholder="Search Clicker lists..." onkeyup="filterTable('clickerListsTable')">
+      <select class="country-filter-select" id="clickerListsTable-countryFilter" onchange="filterTable('clickerListsTable')" style="border:1.5px solid #E2E8F0;border-radius:8px;padding:8px 10px;font-size:12px;font-family:inherit;background:#F8FAFC">
+        <option value="">All Countries</option>
+      </select>
+      </div>
       <div style="overflow-x:auto">
       <table id="clickerListsTable" style="font-size:12px;margin-top:12px">
         <thead><tr>
@@ -3430,6 +3440,19 @@ function renderListPlannerTable(tableId, rows, idPrefix) {
   ];
   initColToggle(tableId, cols, colGroups);
   attachColumnFilters(tableId);
+
+  // Country dropdown — built from whichever rows are actually in this table
+  // (a list can span multiple countries), preserving the current selection
+  // across re-renders and re-applying whatever filter is already active.
+  const countrySel = document.getElementById(tableId + '-countryFilter');
+  if (countrySel) {
+    const prevValue = countrySel.value;
+    const allCountries = [...new Set(rows.flatMap(l => (l.countries || '').split(', ').filter(Boolean)))].sort();
+    countrySel.innerHTML = '<option value="">All Countries</option>' +
+      allCountries.map(c => `<option value="${escAttr(c)}">${c}</option>`).join('');
+    countrySel.value = allCountries.includes(prevValue) ? prevValue : '';
+  }
+  filterTable(tableId);
 }
 
 function toggleListDetail(lid) {
@@ -4287,13 +4310,19 @@ function sortTable(tableId, col, direction) {
 }
 
 function filterTable(tableId) {
-  const input = document.querySelector(`#${tableId}`).previousElementSibling;
-  const filter = input.value.toUpperCase();
+  const card = document.getElementById(tableId).closest('.card');
+  const input = card.querySelector('.search');
+  const filter = (input?.value || '').toUpperCase();
+  const countrySel = document.getElementById(tableId + '-countryFilter');
+  const countryFilter = countrySel ? countrySel.value.toUpperCase() : '';
   const table = document.getElementById(tableId);
   Array.from(table.querySelectorAll('tbody tr')).forEach(row => {
     if (row.closest('.list-detail-row')) return; // skip detail rows and their inner rows
     const text = row.innerText.toUpperCase();
-    row.style.display = text.includes(filter) ? '' : 'none';
+    const countriesCell = row.children[1]; // Countries column — same position in listsTable/clickerListsTable
+    const rowCountries = countriesCell ? countriesCell.innerText.toUpperCase() : '';
+    const matchesCountry = !countryFilter || rowCountries.split(', ').includes(countryFilter);
+    row.style.display = (text.includes(filter) && matchesCountry) ? '' : 'none';
   });
 }
 
