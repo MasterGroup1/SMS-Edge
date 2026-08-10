@@ -1903,108 +1903,167 @@ function scheduleFromList(list, brand, country) {
 // Editing a "When Used #" date directly in the Master List Planner creates,
 // moves, or removes a planned send — the same underlying planned_sends record
 // the Planner tab reads, so the two stay in sync with no extra step.
-// When a Main list's "When Used" date is newly set, auto-schedule its paired
-// Clicker list (same name + " - Clickers") on the nearest day that isn't
-// already a Main send day and isn't already used by the Clicker list itself
-// — so remarketing to clickers never overlaps the original send, and spreads
-// naturally onto the "opposite" days as more Main dates get set through the week.
-async function autoScheduleClickerPair(mainList, newDate) {
-  const clickerName = mainList + ' - Clickers';
-  const clickerGroup = filteredListsClickers.find(l => l.list === clickerName);
-  if (!clickerGroup) return; // no matching Clicker list — nothing to schedule
-
-  const mainDates = new Set(
-    plannedSends.filter(p => p.list === mainList && p.status === 'Planned' && p.planned_date).map(p => p.planned_date)
-  );
-  // "When Used #1-3" only shows the next 3 upcoming — a list can have many
-  // more planned_sends over time, so there's no fixed cap here.
-  const clickerPlans = plannedSends.filter(p => p.list === clickerName && p.status === 'Planned' && p.planned_date);
-  const takenByClicker = new Set(clickerPlans.map(p => p.planned_date));
-
-  let candidate = null;
-  const base = new Date(newDate + 'T00:00:00');
-  for (let offset = 1; offset <= 13; offset++) {
-    const d = new Date(base);
-    d.setDate(d.getDate() + offset);
-    const dStr = localDateStr(d);
-    if (!mainDates.has(dStr) && !takenByClicker.has(dStr)) { candidate = dStr; break; }
+const AUTO_CLICKER_NOTE = 'Auto-scheduled opposite its Main list send day';
+function addDaysStr(dateStr, n) {
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() + n);
+  return localDateStr(d);
+}
+function daysBetweenStr(a, b) {
+  return Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000);
+}
+// Given a Main list's sorted upcoming send dates, work out where its Clicker
+// list should send: one send gets "the day after"; multiple sends in the
+// same stretch get a Clicker date placed between each consecutive pair (plus
+// one after the last), so remarketing lands in the gaps instead of piling up.
+function computeClickerTargetDates(mainDatesSorted) {
+  if (!mainDatesSorted.length) return [];
+  if (mainDatesSorted.length === 1) return [addDaysStr(mainDatesSorted[0], 1)];
+  const targets = [];
+  for (let i = 0; i < mainDatesSorted.length - 1; i++) {
+    const gap = daysBetweenStr(mainDatesSorted[i], mainDatesSorted[i + 1]);
+    if (gap <= 1) continue; // adjacent days — no room between them
+    targets.push(addDaysStr(mainDatesSorted[i], Math.round(gap / 2)));
   }
-  if (!candidate) return;
+  targets.push(addDaysStr(mainDatesSorted[mainDatesSorted.length - 1], 1));
+  return targets;
+}
+// Nudges a target date to the nearest day (checking +1,-1,+2,-2…) that isn't
+// a Main send day and isn't already used by the Clicker list.
+function nearestFreeDay(target, mainDatesSet, clickerDatesSet) {
+  if (!mainDatesSet.has(target) && !clickerDatesSet.has(target)) return target;
+  for (let delta = 1; delta <= 6; delta++) {
+    for (const sign of [1, -1]) {
+      const dStr = addDaysStr(target, sign * delta);
+      if (!mainDatesSet.has(dStr) && !clickerDatesSet.has(dStr)) return dStr;
+    }
+  }
+  return null;
+}
 
-  const newPlan = {
-    _id: crypto.randomUUID(), planned_date: candidate, list: clickerName, brand: '', country: '',
-    status: 'Planned', notes: 'Auto-scheduled opposite its Main list send day', created_at: new Date().toISOString()
-  };
-  plannedSends.push(newPlan);
-  const res = await syncPlannedSend(newPlan._id);
-  if (!res.ok) {
-    plannedSends = plannedSends.filter(p => p._id !== newPlan._id);
-    console.warn('Auto-schedule Clicker date failed to save: ' + res.error);
-  } else {
-    refreshListRows(clickerName);
+// When a Main list's "When Used" date is newly set, recompute its Clicker
+// list's ideal target dates from ALL of that Main list's upcoming dates and
+// add whichever targets aren't already covered — never touches or removes
+// a Clicker date that's already there (manual or otherwise).
+async function autoScheduleClickerPair(mainList) {
+  const clickerName = mainList + ' - Clickers';
+  if (!filteredListsClickers.find(l => l.list === clickerName)) return; // no matching Clicker list
+
+  const today = todayLocalStr();
+  const mainDates = [...new Set(
+    plannedSends.filter(p => p.list === mainList && p.status === 'Planned' && p.planned_date && p.planned_date >= today).map(p => p.planned_date)
+  )].sort();
+  const mainDatesSet = new Set(mainDates);
+  const clickerDatesSet = new Set(
+    plannedSends.filter(p => p.list === clickerName && p.status === 'Planned' && p.planned_date).map(p => p.planned_date)
+  );
+
+  const targets = computeClickerTargetDates(mainDates);
+  for (const target of targets) {
+    const alreadyCovered = [...clickerDatesSet].some(cd => Math.abs(daysBetweenStr(cd, target)) <= 1);
+    if (alreadyCovered) continue;
+    const finalDate = nearestFreeDay(target, mainDatesSet, clickerDatesSet);
+    if (!finalDate) continue;
+
+    const newPlan = {
+      _id: crypto.randomUUID(), planned_date: finalDate, list: clickerName, brand: '', country: '',
+      status: 'Planned', notes: AUTO_CLICKER_NOTE, created_at: new Date().toISOString()
+    };
+    plannedSends.push(newPlan);
+    const res = await syncPlannedSend(newPlan._id);
+    if (res.ok) {
+      clickerDatesSet.add(finalDate);
+      refreshListRows(clickerName);
+    } else {
+      plannedSends = plannedSends.filter(p => p._id !== newPlan._id);
+      console.warn('Auto-schedule Clicker date failed to save: ' + res.error);
+    }
   }
 }
 
-// One-off, user-triggered version of autoScheduleClickerPair for dates that
-// were already entered before the auto-scheduling existed. For every Main
-// list's existing planned dates, backfills a Clicker date for any main date
-// that doesn't already have a nearby (within a week after) Clicker date
-// covering it — so re-running this is safe and won't pile up duplicates.
+// User-triggered bulk pass: (1) removes any auto-scheduled Clicker dates that
+// are now in the past — no point remarketing against a send that already
+// happened, (2) for every Main list with upcoming planned dates, backfills
+// Clicker dates using the same between-the-sends logic as the "going
+// forward" auto-schedule, (3) gives any other worth-reusing Clicker list
+// that isn't tied to a currently-planned Main list a date too, since it
+// doesn't matter which. Safe to re-run — idempotent, never touches
+// manually-entered dates.
 async function backfillClickerSchedule() {
-  const mainLists = [...new Set(
-    plannedSends
-      .filter(p => p.status === 'Planned' && p.planned_date && !p.list.endsWith(' - Clickers'))
-      .map(p => p.list)
-  )];
+  if (!confirm('This will:\n• Remove any auto-scheduled Clicker dates that are already in the past\n• Add Clicker dates for every Main list currently planned from today onward, spaced between/after those sends\n• Give any other relevant Clicker list without a Main list driving it a date too\n\nManually-entered dates are never touched. Continue?')) return;
 
-  let addedCount = 0, listsTouched = 0, failedCount = 0;
+  const today = todayLocalStr();
+  let removedCount = 0, addedCount = 0, failedCount = 0;
+  const listsTouched = new Set();
+
+  const stale = plannedSends.filter(p => p.notes === AUTO_CLICKER_NOTE && p.planned_date && p.planned_date < today);
+  for (const p of stale) {
+    plannedSends = plannedSends.filter(x => x._id !== p._id);
+    if (sb) {
+      const { error } = await sb.from('planned_sends').delete().eq('id', p._id);
+      if (!error) removedCount++;
+    } else {
+      removedCount++;
+    }
+  }
+
+  const mainLists = [...new Set(
+    plannedSends.filter(p => p.status === 'Planned' && p.planned_date && p.planned_date >= today && !p.list.endsWith(' - Clickers')).map(p => p.list)
+  )];
+  const usedClickerLists = new Set();
+
   for (const mainList of mainLists) {
     const clickerName = mainList + ' - Clickers';
-    if (!filteredListsClickers.find(l => l.list === clickerName)) continue; // no Clicker pair for this list
+    if (!filteredListsClickers.find(l => l.list === clickerName)) continue;
+    usedClickerLists.add(clickerName);
 
     const mainDates = [...new Set(
-      plannedSends.filter(p => p.list === mainList && p.status === 'Planned' && p.planned_date).map(p => p.planned_date)
+      plannedSends.filter(p => p.list === mainList && p.status === 'Planned' && p.planned_date && p.planned_date >= today).map(p => p.planned_date)
     )].sort();
     const mainDatesSet = new Set(mainDates);
-    const clickerDates = new Set(
+    const clickerDatesSet = new Set(
       plannedSends.filter(p => p.list === clickerName && p.status === 'Planned' && p.planned_date).map(p => p.planned_date)
     );
 
-    let touchedThisList = false;
-    for (const mainDate of mainDates) {
-      const base = new Date(mainDate + 'T00:00:00');
-      // Already covered if some Clicker date falls in the week right after this Main date.
-      let covered = false;
-      for (let k = 0; k <= 13; k++) {
-        const d = new Date(base); d.setDate(d.getDate() + k);
-        if (clickerDates.has(localDateStr(d))) { covered = true; break; }
-      }
-      if (covered) continue;
-
-      let candidate = null;
-      for (let offset = 1; offset <= 13; offset++) {
-        const d = new Date(base); d.setDate(d.getDate() + offset);
-        const dStr = localDateStr(d);
-        if (!mainDatesSet.has(dStr) && !clickerDates.has(dStr)) { candidate = dStr; break; }
-      }
-      if (!candidate) continue;
+    for (const target of computeClickerTargetDates(mainDates)) {
+      const alreadyCovered = [...clickerDatesSet].some(cd => Math.abs(daysBetweenStr(cd, target)) <= 1);
+      if (alreadyCovered) continue;
+      const finalDate = nearestFreeDay(target, mainDatesSet, clickerDatesSet);
+      if (!finalDate) continue;
 
       const newPlan = {
-        _id: crypto.randomUUID(), planned_date: candidate, list: clickerName, brand: '', country: '',
-        status: 'Planned', notes: 'Auto-scheduled opposite its Main list send day', created_at: new Date().toISOString()
+        _id: crypto.randomUUID(), planned_date: finalDate, list: clickerName, brand: '', country: '',
+        status: 'Planned', notes: AUTO_CLICKER_NOTE, created_at: new Date().toISOString()
       };
       plannedSends.push(newPlan);
       const res = await syncPlannedSend(newPlan._id);
       if (res.ok) {
-        clickerDates.add(candidate);
+        clickerDatesSet.add(finalDate);
         addedCount++;
-        touchedThisList = true;
+        listsTouched.add(mainList);
       } else {
         plannedSends = plannedSends.filter(p => p._id !== newPlan._id);
         failedCount++;
       }
     }
-    if (touchedThisList) listsTouched++;
+  }
+
+  // Clicker lists worth using that aren't tied to any currently-planned Main
+  // list — give them a date too, since it doesn't matter which.
+  for (const cl of filteredListsClickers) {
+    if (usedClickerLists.has(cl.list) || cl.reuse === 'No') continue;
+    const hasAnyUpcoming = plannedSends.some(p => p.list === cl.list && p.status === 'Planned' && p.planned_date && p.planned_date >= today);
+    if (hasAnyUpcoming) continue;
+
+    const finalDate = addDaysStr(today, 1);
+    const newPlan = {
+      _id: crypto.randomUUID(), planned_date: finalDate, list: cl.list, brand: '', country: '',
+      status: 'Planned', notes: AUTO_CLICKER_NOTE, created_at: new Date().toISOString()
+    };
+    plannedSends.push(newPlan);
+    const res = await syncPlannedSend(newPlan._id);
+    if (res.ok) { addedCount++; listsTouched.add(cl.list); }
+    else { plannedSends = plannedSends.filter(p => p._id !== newPlan._id); failedCount++; }
   }
 
   recomputeAggregates();
@@ -2013,13 +2072,11 @@ async function backfillClickerSchedule() {
   renderPlannerTable();
   renderPlannerCalendar();
 
-  if (failedCount) {
-    alert(`Added ${addedCount} Clicker date(s) across ${listsTouched} list(s), but ${failedCount} failed to save — check your connection and try again.`);
-  } else if (addedCount) {
-    alert(`Added ${addedCount} Clicker date(s) across ${listsTouched} list(s), each on a day that avoids its Main list's send days.`);
-  } else {
-    alert('Every Clicker list already has a date near its Main list\'s sends — nothing to add.');
-  }
+  const parts = [];
+  if (removedCount) parts.push(`removed ${removedCount} past auto-scheduled date(s)`);
+  if (addedCount) parts.push(`added ${addedCount} Clicker date(s) across ${listsTouched.size} list(s)`);
+  if (failedCount) parts.push(`${failedCount} failed to save — check your connection`);
+  alert(parts.length ? parts.join('; ') + '.' : 'Nothing to change — everything is already aligned.');
 }
 
 async function onWhenUsedChange(input) {
@@ -2058,7 +2115,7 @@ async function onWhenUsedChange(input) {
   // send day — see autoScheduleClickerPair(). Only fires from the Main side,
   // and only for a newly-set date, so it can't loop or fight manual edits.
   if (!saveError && newDate && !list.endsWith(' - Clickers')) {
-    await autoScheduleClickerPair(list, newDate);
+    await autoScheduleClickerPair(list);
   }
 
   recomputeAggregates();
