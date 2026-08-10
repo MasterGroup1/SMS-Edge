@@ -863,7 +863,8 @@ tbody tr:hover{background:#F8FAFC}
             <span id="calendarMonthLabel" style="font-weight:700;min-width:130px;text-align:center;display:inline-block;color:#0F172A"></span>
             <button class="col-toggle" onclick="calendarNav(1)">Next ›</button>
             <button class="col-toggle" onclick="calendarNav(0)">Today</button>
-            <button class="col-toggle" onclick="backfillClickerSchedule()" title="For every Main list's already-planned dates, schedule its paired Clicker list on a day that avoids them" style="background:#3B82F6;color:#fff;border-color:#3B82F6">🔄 Align Clicker Dates</button>
+            <input id="clickerAlignCountries" type="text" value="Australia, New Zealand" placeholder="Countries, comma-separated — blank = all" title="Only align Clicker dates for these countries. Clear this to cover every country." style="border:1px solid #E2E8F0;border-radius:6px;padding:5px 8px;font-size:12px;font-family:inherit;width:190px">
+            <button class="col-toggle" onclick="backfillClickerSchedule()" title="For every in-scope Main list's already-planned dates, schedule its paired Clicker list on a day that avoids them" style="background:#3B82F6;color:#fff;border-color:#3B82F6">🔄 Align Clicker Dates</button>
           </div>
         </div>
         <div id="calendarGrid"></div>
@@ -1992,26 +1993,48 @@ async function autoScheduleClickerPair(mainList) {
 // that isn't tied to a currently-planned Main list a date too, since it
 // doesn't matter which. Safe to re-run — idempotent, never touches
 // manually-entered dates.
+// Country of a list — checked against filteredListsMain first (a Clicker
+// list's own row has the same countries as the campaigns behind it, but
+// falling back covers either).
+function listCountriesOf(list) {
+  const g = filteredListsMain.find(l => l.list === list) || filteredListsClickers.find(l => l.list === list);
+  return g ? g.countries : '';
+}
+
 async function backfillClickerSchedule() {
-  if (!confirm('This will:\n• Remove any auto-scheduled Clicker dates that are already in the past\n• Add Clicker dates for every Main list currently planned from today onward, spaced between/after those sends\n• Give any other relevant Clicker list without a Main list driving it a date too\n\nManually-entered dates are never touched. Continue?')) return;
+  const scopeRaw = (document.getElementById('clickerAlignCountries')?.value || '').trim();
+  const scope = scopeRaw ? scopeRaw.split(',').map(s => s.trim()).filter(Boolean) : null;
+  const inScope = (list) => {
+    if (!scope) return true;
+    const countriesStr = listCountriesOf(list).toLowerCase();
+    return scope.some(c => countriesStr.includes(c.toLowerCase()));
+  };
+
+  const scopeMsg = scope ? `only for ${scope.join(', ')} — Clicker dates for any other country will be removed` : 'for every country';
+  if (!confirm(`This will, ${scopeMsg}:\n• Remove any auto-scheduled Clicker dates that are already in the past\n• Add Clicker dates for every in-scope Main list currently planned from today onward, spaced between/after those sends\n• Give any other in-scope relevant Clicker list without a Main list driving it a date too\n\nManually-entered dates are never touched. Continue?`)) return;
 
   const today = todayLocalStr();
   let removedCount = 0, addedCount = 0, failedCount = 0;
   const listsTouched = new Set();
 
-  const stale = plannedSends.filter(p => p.notes === AUTO_CLICKER_NOTE && p.planned_date && p.planned_date < today);
-  for (const p of stale) {
+  // Always drop past auto-scheduled dates; when scoped, also drop future
+  // auto-scheduled dates for lists outside the current scope (Clicker or
+  // Main-list-adjacent) so re-running with a narrower scope actually narrows.
+  let removedPastCount = 0, removedOutOfScopeCount = 0;
+  const toRemove = plannedSends.filter(p =>
+    p.notes === AUTO_CLICKER_NOTE && p.planned_date && (p.planned_date < today || !inScope(p.list))
+  );
+  for (const p of toRemove) {
     plannedSends = plannedSends.filter(x => x._id !== p._id);
-    if (sb) {
-      const { error } = await sb.from('planned_sends').delete().eq('id', p._id);
-      if (!error) removedCount++;
-    } else {
+    const ok = sb ? !(await sb.from('planned_sends').delete().eq('id', p._id)).error : true;
+    if (ok) {
       removedCount++;
+      if (p.planned_date < today) removedPastCount++; else removedOutOfScopeCount++;
     }
   }
 
   const mainLists = [...new Set(
-    plannedSends.filter(p => p.status === 'Planned' && p.planned_date && p.planned_date >= today && !p.list.endsWith(' - Clickers')).map(p => p.list)
+    plannedSends.filter(p => p.status === 'Planned' && p.planned_date && p.planned_date >= today && !p.list.endsWith(' - Clickers') && inScope(p.list)).map(p => p.list)
   )];
   const usedClickerLists = new Set();
 
@@ -2062,7 +2085,7 @@ async function backfillClickerSchedule() {
   weekDays.forEach(d => { dayLoad[d] = plannedSends.filter(p => p.status === 'Planned' && p.planned_date === d).length; });
 
   for (const cl of filteredListsClickers) {
-    if (usedClickerLists.has(cl.list) || cl.reuse === 'No' || !cl.list.endsWith(' - Clickers')) continue;
+    if (usedClickerLists.has(cl.list) || cl.reuse === 'No' || !cl.list.endsWith(' - Clickers') || !inScope(cl.list)) continue;
     const hasAnyUpcoming = plannedSends.some(p => p.list === cl.list && p.status === 'Planned' && p.planned_date && p.planned_date >= today);
     if (hasAnyUpcoming) continue;
 
@@ -2084,7 +2107,8 @@ async function backfillClickerSchedule() {
   renderPlannerCalendar();
 
   const parts = [];
-  if (removedCount) parts.push(`removed ${removedCount} past auto-scheduled date(s)`);
+  if (removedPastCount) parts.push(`removed ${removedPastCount} past auto-scheduled date(s)`);
+  if (removedOutOfScopeCount) parts.push(`removed ${removedOutOfScopeCount} out-of-scope auto-scheduled date(s)`);
   if (addedCount) parts.push(`added ${addedCount} Clicker date(s) across ${listsTouched.size} list(s)`);
   if (failedCount) parts.push(`${failedCount} failed to save — check your connection`);
   alert(parts.length ? parts.join('; ') + '.' : 'Nothing to change — everything is already aligned.');
