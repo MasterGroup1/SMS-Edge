@@ -2001,6 +2001,35 @@ function listCountriesOf(list) {
   return g ? g.countries : '';
 }
 
+// Belt-and-braces cleanup for exact-duplicate (list, date, status) rows —
+// can happen if scheduling ran more than once across different sessions
+// before this existed. Keeps one row per combo, preferring a manually
+// entered one (no auto-scheduled note) over an auto-scheduled duplicate.
+async function dedupePlannedSends() {
+  const seen = new Map();
+  const toDelete = [];
+  for (const p of plannedSends) {
+    if (!p.planned_date) continue;
+    const key = p.list + '|' + p.planned_date + '|' + p.status;
+    const existing = seen.get(key);
+    if (!existing) {
+      seen.set(key, p);
+    } else if (existing.notes === AUTO_CLICKER_NOTE && p.notes !== AUTO_CLICKER_NOTE) {
+      toDelete.push(existing);
+      seen.set(key, p);
+    } else {
+      toDelete.push(p);
+    }
+  }
+  let removed = 0;
+  for (const p of toDelete) {
+    plannedSends = plannedSends.filter(x => x._id !== p._id);
+    const ok = sb ? !(await sb.from('planned_sends').delete().eq('id', p._id)).error : true;
+    if (ok) removed++;
+  }
+  return removed;
+}
+
 async function backfillClickerSchedule() {
   const scopeRaw = (document.getElementById('clickerAlignCountries')?.value || '').trim();
   const scope = scopeRaw ? scopeRaw.split(',').map(s => s.trim()).filter(Boolean) : null;
@@ -2011,7 +2040,9 @@ async function backfillClickerSchedule() {
   };
 
   const scopeMsg = scope ? `only for ${scope.join(', ')} — Clicker dates for any other country will be removed` : 'for every country';
-  if (!confirm(`This will, ${scopeMsg}:\n• Remove any auto-scheduled Clicker dates that are already in the past\n• Add Clicker dates for every in-scope Main list currently planned from today onward, spaced between/after those sends\n• Give any other in-scope relevant Clicker list without a Main list driving it a date too\n\nManually-entered dates are never touched. Continue?`)) return;
+  if (!confirm(`This will, ${scopeMsg}:\n• Remove any duplicate planned dates for the same list/day (a list should only send once a day)\n• Remove any auto-scheduled Clicker dates that are already in the past\n• Add Clicker dates for every in-scope Main list currently planned from today onward, spaced between/after those sends — never on the same day as that list's own Main sends\n• Give any other in-scope relevant Clicker list without a Main list driving it a date too\n\nManually-entered dates are never touched. Continue?`)) return;
+
+  const dedupedCount = await dedupePlannedSends();
 
   const today = todayLocalStr();
   let removedCount = 0, addedCount = 0, failedCount = 0;
@@ -2107,6 +2138,7 @@ async function backfillClickerSchedule() {
   renderPlannerCalendar();
 
   const parts = [];
+  if (dedupedCount) parts.push(`removed ${dedupedCount} duplicate planned date(s)`);
   if (removedPastCount) parts.push(`removed ${removedPastCount} past auto-scheduled date(s)`);
   if (removedOutOfScopeCount) parts.push(`removed ${removedOutOfScopeCount} out-of-scope auto-scheduled date(s)`);
   if (addedCount) parts.push(`added ${addedCount} Clicker date(s) across ${listsTouched.size} list(s)`);
