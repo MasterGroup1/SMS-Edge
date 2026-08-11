@@ -679,6 +679,29 @@ tbody tr:hover{background:#F8FAFC}
           </div>
         </div>
       </div>
+      <p style="font-size:12px;color:#64748B;margin-bottom:12px">New lists created on the platform don't get real metrics until they're sent — register one below to plan a date for it right away. It's replaced automatically by its real campaign data on the next CSV import.</p>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin-bottom:14px;padding:12px;background:#F8FAFC;border-radius:8px">
+        <div>
+          <label style="display:block;font-size:11px;font-weight:600;color:#64748B;margin-bottom:4px">List Name</label>
+          <input id="regListInput" type="text" placeholder="e.g. Royboy_IT_15082026_batch1" style="border:1px solid #E2E8F0;border-radius:6px;padding:6px 8px;font-size:12px;width:230px;font-family:inherit">
+        </div>
+        <div>
+          <label style="display:block;font-size:11px;font-weight:600;color:#64748B;margin-bottom:4px">Country</label>
+          <input id="regCountryInput" type="text" placeholder="e.g. Italy" style="border:1px solid #E2E8F0;border-radius:6px;padding:6px 8px;font-size:12px;width:130px;font-family:inherit">
+        </div>
+        <div>
+          <label style="display:block;font-size:11px;font-weight:600;color:#64748B;margin-bottom:4px">Partner</label>
+          <input id="regPartnerInput" type="text" placeholder="optional" style="border:1px solid #E2E8F0;border-radius:6px;padding:6px 8px;font-size:12px;width:130px;font-family:inherit">
+        </div>
+        <div>
+          <label style="display:block;font-size:11px;font-weight:600;color:#64748B;margin-bottom:4px">Type</label>
+          <select id="regTypeInput" style="border:1px solid #E2E8F0;border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit">
+            <option value="Fresh">Main list</option>
+            <option value="Clicked">Clicker list</option>
+          </select>
+        </div>
+        <button class="col-toggle" onclick="addRegisteredList()" style="background:#3B82F6;color:#fff;border-color:#3B82F6">+ Add List</button>
+      </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
       <input type="text" class="search" placeholder="Search lists..." onkeyup="filterTable('listsTable')">
       <select class="country-filter-select" id="listsTable-countryFilter" onchange="filterTable('listsTable')" style="border:1.5px solid #E2E8F0;border-radius:8px;padding:8px 10px;font-size:12px;font-family:inherit;background:#F8FAFC">
@@ -1743,13 +1766,14 @@ async function initSupabase() {
   setDbStatus('connecting', 'Connecting…');
   try {
     sb = supabase.createClient(SB_URL, SB_KEY);
-    const [{ data: dbCamps, error: campErr }, { data: dbContent, error: contErr }, { data: dbDecisions, error: decErr }, { data: dbPlans, error: planErr }, { data: dbSizes, error: sizeErr }, { data: dbRoutes, error: routesErr }] = await Promise.all([
+    const [{ data: dbCamps, error: campErr }, { data: dbContent, error: contErr }, { data: dbDecisions, error: decErr }, { data: dbPlans, error: planErr }, { data: dbSizes, error: sizeErr }, { data: dbRoutes, error: routesErr }, { data: dbRegistry, error: registryErr }] = await Promise.all([
       fetchAllCampaigns(),
       sb.from('content_rows').select('*').order('sort_order'),
       sb.from('list_decisions').select('*'),
       sb.from('planned_sends').select('*').order('planned_date'),
       sb.from('list_sizes').select('*'),
-      sb.from('active_routes').select('*')
+      sb.from('active_routes').select('*'),
+      sb.from('list_registry').select('*')
     ]);
     if (!planErr && dbPlans) {
       plannedSends = dbPlans.map(p => ({
@@ -1776,6 +1800,17 @@ async function initSupabase() {
         // Table exists but is empty (first run) — seed it once with the
         // baked-in starter list so Supabase becomes authoritative from here on.
         saveActiveRoutesBatch(activeRoutes);
+      }
+    }
+    if (!registryErr && dbRegistry) {
+      if (dbRegistry.length > 0) {
+        registeredLists = dbRegistry.map(r => ({
+          _id: r.id, list: r.list || '', country: r.country || '', partner: r.partner || '', type: r.type || 'Fresh'
+        }));
+      } else {
+        // Table exists but is empty (first run) — seed it once with the
+        // baked-in starter set so Supabase becomes authoritative from here on.
+        saveRegisteredListsBatch(registeredLists);
       }
     }
     if (!campErr && dbCamps && dbCamps.length > 0) {
@@ -2467,12 +2502,17 @@ async function updateListSize(list, size) {
 // the bulk junk-Clicker cleanup so the latter doesn't pop a dialog per list.
 async function deleteListCore(list) {
   const campsForList = campaigns.filter(c => c.list === list);
-  if (!campsForList.length) return { ok: false, count: 0, error: 'No campaigns found for this list.' };
+  const registryEntry = registeredLists.find(r => normalizeListName(r.list) === list);
+
+  if (!campsForList.length && !registryEntry) return { ok: false, count: 0, error: 'No campaigns found for this list.' };
 
   const ids = new Set(campsForList.map(c => c.id));
   if (sb) {
-    const { error: delCampErr } = await sb.from('campaigns').delete().in('id', [...ids]);
-    if (delCampErr) return { ok: false, count: 0, error: delCampErr.message };
+    if (ids.size) {
+      const { error: delCampErr } = await sb.from('campaigns').delete().in('id', [...ids]);
+      if (delCampErr) return { ok: false, count: 0, error: delCampErr.message };
+    }
+    if (registryEntry) await sb.from('list_registry').delete().eq('id', registryEntry._id);
     await sb.from('list_sizes').delete().eq('list', list);
     await sb.from('list_decisions').delete().eq('list', list);
     await sb.from('planned_sends').delete().eq('list', list);
@@ -2482,6 +2522,7 @@ async function deleteListCore(list) {
     if (ids.has(campaigns[i].id)) campaigns.splice(i, 1);
   }
   filteredCampaigns = filteredCampaigns.filter(c => !ids.has(c.id));
+  if (registryEntry) registeredLists = registeredLists.filter(r => r._id !== registryEntry._id);
   delete listSizes[list];
   delete listDecisions[list];
   plannedSends = plannedSends.filter(p => p.list !== list);
@@ -2491,8 +2532,10 @@ async function deleteListCore(list) {
 
 async function deleteList(list) {
   const campsForList = campaigns.filter(c => c.list === list);
-  if (!campsForList.length) { alert('No campaigns found for this list — nothing to delete.'); return; }
-  if (!confirm(`Delete "${list}"? This will permanently remove ${campsForList.length} campaign(s), plus its list size, decision history, and any planned sends. This cannot be undone.`)) return;
+  const registryEntry = registeredLists.find(r => normalizeListName(r.list) === list);
+  if (!campsForList.length && !registryEntry) { alert('No campaigns found for this list — nothing to delete.'); return; }
+  const what = campsForList.length ? `${campsForList.length} campaign(s), plus its list size, decision history, and any planned sends` : 'this not-yet-sent list registration, plus its list size, decision history, and any planned sends';
+  if (!confirm(`Delete "${list}"? This will permanently remove ${what}. This cannot be undone.`)) return;
 
   const res = await deleteListCore(list);
   if (!res.ok) { alert('Failed to delete: ' + res.error); return; }
@@ -2504,6 +2547,51 @@ async function deleteList(list) {
   renderClickerListsTable();
   if (document.getElementById('planner')?.classList.contains('active')) renderPlannerTab();
   alert(`Deleted "${list}" (${res.count} campaign(s)).`);
+}
+
+// ── LIST REGISTRY (lists that exist on the platform but haven't sent yet) ──
+async function syncRegisteredList(id) {
+  if (!sb) return { ok: false, error: 'Not connected to the database — this will not be saved.' };
+  const r = registeredLists.find(x => x._id === id);
+  if (!r) return { ok: false, error: 'List not found locally.' };
+  const { error } = await sb.from('list_registry').upsert({
+    id: r._id, list: r.list || '', country: r.country || '', partner: r.partner || '', type: r.type || 'Fresh'
+  }, { onConflict: 'id' });
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+async function saveRegisteredListsBatch(lists) {
+  if (!sb || !lists.length) return;
+  const rows = lists.map(r => ({ id: r._id, list: r.list || '', country: r.country || '', partner: r.partner || '', type: r.type || 'Fresh' }));
+  await sb.from('list_registry').upsert(rows, { onConflict: 'id' });
+}
+
+async function addRegisteredList() {
+  const list = document.getElementById('regListInput').value.trim();
+  const country = document.getElementById('regCountryInput').value.trim();
+  const partner = document.getElementById('regPartnerInput').value.trim();
+  const type = document.getElementById('regTypeInput').value;
+  if (!list || !country) { alert('List name and Country are required.'); return; }
+
+  const nList = normalizeListName(list);
+  if (campaigns.some(c => c.list === nList) || registeredLists.some(r => normalizeListName(r.list) === nList)) {
+    alert(`"${nList}" already exists — nothing to add.`);
+    return;
+  }
+
+  const newEntry = { _id: crypto.randomUUID(), list, country, partner, type };
+  registeredLists.push(newEntry);
+  const res = await syncRegisteredList(newEntry._id);
+  if (!res.ok) alert('This list was NOT saved to the database (it will disappear on refresh): ' + res.error);
+
+  document.getElementById('regListInput').value = '';
+  document.getElementById('regCountryInput').value = '';
+  document.getElementById('regPartnerInput').value = '';
+
+  recomputeAggregates();
+  renderListsTable();
+  renderClickerListsTable();
 }
 
 // Legacy general per-country Clicker buckets (e.g. "IT Clicked", "DE Clicked")
@@ -2938,6 +3026,65 @@ let filteredListsClickers = []; // per-list rows for Clicker/retargeting segment
 let listDecisions = {}; // manual Use Again overrides, keyed by normalized list name — see recomputeAggregates()
 let listSizes = {}; // manual full list size (contacts), keyed by normalized list name — sends are often partial, so this can't be derived from Sent
 let plannedSends = []; // Planner tab: scheduled + historical sends, backed by the planned_sends table
+// Lists that exist (created on the platform) but haven't been sent yet have
+// no campaigns, so they'd never appear in the planning tables — registering
+// them here lets them show up as a plannable row with zero metrics until
+// their first real send arrives via CSV import, at which point the real
+// campaign data takes over automatically (same normalized list name).
+// Starter set: lists confirmed created on the platform (2026-08-06 through
+// 2026-08-10 batches) but not yet imported into the dashboard's campaign
+// data, from the SMS List Inventory sent 2026-08-11.
+let registeredLists = [
+  {list:'Royboy_AT_06082026_batch1', country:'Austria', partner:'Roy Boy', type:'Fresh'},
+  {list:'Royboy_AT_06082026_batch2', country:'Austria', partner:'Roy Boy', type:'Fresh'},
+  {list:'Royboy_AT_06082026_batch3', country:'Austria', partner:'Roy Boy', type:'Fresh'},
+  {list:'Royboy_AT_06082026_batch4', country:'Austria', partner:'Roy Boy', type:'Fresh'},
+  {list:'Royboy_AT_06082026_batch5', country:'Austria', partner:'Roy Boy', type:'Fresh'},
+  {list:'Royboy_AU_06082026_batch1', country:'Australia', partner:'Roy Boy', type:'Fresh'},
+  {list:'Royboy_AU_06082026_batch2', country:'Australia', partner:'Roy Boy', type:'Fresh'},
+  {list:'Royboy_AU_06082026_batch3', country:'Australia', partner:'Roy Boy', type:'Fresh'},
+  {list:'Royboy_DE_06082026_batch1', country:'Germany', partner:'Roy Boy', type:'Fresh'},
+  {list:'Royboy_DE_06082026_batch2', country:'Germany', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_IT_06082026', country:'Italy', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_NZ_06082026', country:'New Zealand', partner:'Roy Boy', type:'Fresh'},
+  {list:'Royboy_AT_10082026_batch1', country:'Austria', partner:'Roy Boy', type:'Fresh'},
+  {list:'Royboy_AU_10082026_batch1', country:'Australia', partner:'Roy Boy', type:'Fresh'},
+  {list:'Royboy_AU_10082026_batch2', country:'Australia', partner:'Roy Boy', type:'Fresh'},
+  {list:'Royboy_DE_10082026_batch2', country:'Germany', partner:'Roy Boy', type:'Fresh'},
+  {list:'Royboy_DE_10082026_batch3', country:'Germany', partner:'Roy Boy', type:'Fresh'},
+  {list:'Royboy_DE_10082026_batch4', country:'Germany', partner:'Roy Boy', type:'Fresh'},
+  {list:'Royboy_DE_10082026_batch5', country:'Germany', partner:'Roy Boy', type:'Fresh'},
+  {list:'Royboy_DE_10082026_batch6', country:'Germany', partner:'Roy Boy', type:'Fresh'},
+  {list:'Royboy_DE_10082026_batch7', country:'Germany', partner:'Roy Boy', type:'Fresh'},
+  {list:'Royboy_IT_10082026_batch1', country:'Italy', partner:'Roy Boy', type:'Fresh'},
+  {list:'Royboy_IT_10082026_batch2', country:'Italy', partner:'Roy Boy', type:'Fresh'},
+  {list:'Royboy_IT_10082026_batch3', country:'Italy', partner:'Roy Boy', type:'Fresh'},
+  {list:'Royboy_AT_06082026_batch1 - Clickers', country:'Austria', partner:'Roy Boy', type:'Clicked'},
+  {list:'Royboy_AT_06082026_batch2 - Clickers', country:'Austria', partner:'Roy Boy', type:'Clicked'},
+  {list:'Royboy_AT_06082026_batch3 - Clickers', country:'Austria', partner:'Roy Boy', type:'Clicked'},
+  {list:'Royboy_AT_06082026_batch4 - Clickers', country:'Austria', partner:'Roy Boy', type:'Clicked'},
+  {list:'Royboy_AT_06082026_batch5 - Clickers', country:'Austria', partner:'Roy Boy', type:'Clicked'},
+  {list:'Royboy_AU_06082026_batch1 - Clickers', country:'Australia', partner:'Roy Boy', type:'Clicked'},
+  {list:'Royboy_AU_06082026_batch2 - Clickers', country:'Australia', partner:'Roy Boy', type:'Clicked'},
+  {list:'Royboy_AU_06082026_batch3 - Clickers', country:'Australia', partner:'Roy Boy', type:'Clicked'},
+  {list:'Royboy_DE_06082026_batch1 - Clickers', country:'Germany', partner:'Roy Boy', type:'Clicked'},
+  {list:'Royboy_DE_06082026_batch2 - Clickers', country:'Germany', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_IT_06082026 - Clickers', country:'Italy', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_NZ_06082026 - Clickers', country:'New Zealand', partner:'Roy Boy', type:'Clicked'},
+  {list:'Royboy_AT_10082026_batch1 - Clickers', country:'Austria', partner:'Roy Boy', type:'Clicked'},
+  {list:'Royboy_AU_10082026_batch1 - Clickers', country:'Australia', partner:'Roy Boy', type:'Clicked'},
+  {list:'Royboy_AU_10082026_batch2 - Clickers', country:'Australia', partner:'Roy Boy', type:'Clicked'},
+  {list:'Royboy_DE_10082026_batch2 - Clickers', country:'Germany', partner:'Roy Boy', type:'Clicked'},
+  {list:'Royboy_DE_10082026_batch3 - Clickers', country:'Germany', partner:'Roy Boy', type:'Clicked'},
+  {list:'Royboy_DE_10082026_batch4 - Clickers', country:'Germany', partner:'Roy Boy', type:'Clicked'},
+  {list:'Royboy_DE_10082026_batch5 - Clickers', country:'Germany', partner:'Roy Boy', type:'Clicked'},
+  {list:'Royboy_DE_10082026_batch6 - Clickers', country:'Germany', partner:'Roy Boy', type:'Clicked'},
+  {list:'Royboy_DE_10082026_batch7 - Clickers', country:'Germany', partner:'Roy Boy', type:'Clicked'},
+  {list:'Royboy_IT_10082026_batch1 - Clickers', country:'Italy', partner:'Roy Boy', type:'Clicked'},
+  {list:'Royboy_IT_10082026_batch2 - Clickers', country:'Italy', partner:'Roy Boy', type:'Clicked'},
+  {list:'Royboy_IT_10082026_batch3 - Clickers', country:'Italy', partner:'Roy Boy', type:'Clicked'}
+];
+registeredLists.forEach(r => { r._id = crypto.randomUUID(); });
 
 // Questions state
 let questions = [
@@ -3422,6 +3569,22 @@ function recomputeAggregates() {
     }
   });
 
+  // Registered-but-not-yet-sent lists — created on the platform but no
+  // campaign data exists yet. Seed an empty placeholder group so they're
+  // plannable from day one; once a real send comes in via CSV import, the
+  // normalized list name matches and the real campaign data takes over.
+  registeredLists.forEach(r => {
+    const nList = normalizeListName(r.list);
+    if (!nList || isJunkList(nList)) return;
+    const listKey = (r.type === 'Clicked' ? 'CLK:' : 'FRESH:') + nList;
+    if (!listGroups[listKey]) {
+      listGroups[listKey] = {
+        list: nList, isClicker: r.type === 'Clicked', camps: 0, sent: 0, clicks: 0, leads: 0, sales: 0, cost: 0,
+        _countries: new Set(r.country ? [r.country] : []), _dates: [], _sendEndDates: [], _laps: 0, _campaigns: []
+      };
+    }
+  });
+
   // Compute metrics for each group
   const computeMetrics = (group) => {
     group.revenue = group.sales * 20;
@@ -3443,7 +3606,12 @@ function recomputeAggregates() {
       const _ecpaFtd = group.sales > 0 ? group.cost / group.sales : Infinity;
       const _ecpaReg = group.leads > 0 ? group.cost / group.leads : Infinity;
       const _proven  = group.camps > 5 && _ecpaReg < 280 && group.leads > 5;
-      if ((group.sales > 0 && _ecpaFtd <= 280) || _proven) {
+      // A list needs a few rounds before its data means anything — under 3
+      // sends (including zero, for a brand-new list that hasn't gone out
+      // yet) always defaults to Yes regardless of what the numbers show.
+      if (group.camps < 3) {
+        group.reuse = 'Yes';
+      } else if ((group.sales > 0 && _ecpaFtd <= 280) || _proven) {
         group.reuse = 'Yes';
       } else if (group.sales > 0 || group.leads > 2) {
         group.reuse = 'Maybe';
@@ -3452,13 +3620,17 @@ function recomputeAggregates() {
       }
       // Build "Reasons Not to Use" explanation
       const _reasons = [];
+      if (group.camps < 3) {
+        _reasons.push(group.camps === 0
+          ? 'Not sent yet — still worth a few rounds before judging'
+          : 'Only ' + group.camps + ' send(s) so far — give it a few more rounds before judging');
+      }
       if (_ecpaFtd < Infinity && _ecpaFtd > 280) _reasons.push('ECPA (FTD) €' + _ecpaFtd.toFixed(0) + ' > €280 limit');
       if (group.sales === 0 && group.camps >= 3) _reasons.push('No sales after ' + group.camps + ' campaigns');
       if (group.leads === 0 && group.camps >= 2) _reasons.push('Zero leads across ' + group.camps + ' sends');
       if (group.leads === 0 && group.camps === 1) _reasons.push('Zero leads — single send, no engagement');
       if (group.ctr < 0.01 && group.camps >= 2) _reasons.push('CTR below 1% — list not engaging');
       if (group.click_to_lead < 0.05 && group.clicks > 50) _reasons.push('Cl→Lead below 5%');
-      if (group.camps <= 2 && group.reuse === 'Yes') _reasons.push('Only ' + group.camps + ' send(s) — validate further');
       // For hard No with no specific reason yet, always generate one
       if (group.reuse === 'No' && _reasons.length === 0) {
         if (group.leads <= 2 && group.sales === 0) {
