@@ -886,8 +886,11 @@ tbody tr:hover{background:#F8FAFC}
             <span id="calendarMonthLabel" style="font-weight:700;min-width:130px;text-align:center;display:inline-block;color:#0F172A"></span>
             <button class="col-toggle" onclick="calendarNav(1)">Next ›</button>
             <button class="col-toggle" onclick="calendarNav(0)">Today</button>
-            <input id="clickerAlignCountries" type="text" value="" placeholder="Countries, comma-separated — blank = all" title="Blank covers every country. Only fill this in if you want to align Clicker dates for specific countries only — it will remove auto-scheduled dates for anything outside that list." style="border:1px solid #E2E8F0;border-radius:6px;padding:5px 8px;font-size:12px;font-family:inherit;width:190px">
-            <button class="col-toggle" onclick="backfillClickerSchedule()" title="For every in-scope Main list's already-planned dates, schedule its paired Clicker list on a day that avoids them" style="background:#3B82F6;color:#fff;border-color:#3B82F6">🔄 Align Clicker Dates</button>
+            <div id="clickerAlignCountryPicker" style="position:relative;display:inline-block">
+              <button type="button" class="col-toggle" onclick="toggleClickerAlignCountryMenu(event)" title="Pick which country/countries to align Clicker dates for — nothing runs until you pick at least one">🌍 <span id="clickerAlignCountryLabel">Select countries…</span> ▾</button>
+              <div id="clickerAlignCountryMenu" style="display:none;position:absolute;top:100%;left:0;margin-top:4px;z-index:50;background:#fff;border:1px solid #E2E8F0;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.15);padding:8px;max-height:280px;overflow-y:auto;min-width:200px;font-size:12px"></div>
+            </div>
+            <button class="col-toggle" onclick="backfillClickerSchedule()" title="For every planned-date Main list in the countries picked above, schedule its paired Clicker list on a day that avoids them. Removes auto-scheduled Clicker dates for any country not picked." style="background:#3B82F6;color:#fff;border-color:#3B82F6">🔄 Align Clicker Dates</button>
           </div>
         </div>
         <div id="calendarGrid"></div>
@@ -1951,20 +1954,33 @@ function addDaysStr(dateStr, n) {
 function daysBetweenStr(a, b) {
   return Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000);
 }
+// Last Sunday of the Mon-Sun week containing dateStr — the weekly replan
+// boundary Clicker auto-scheduling should never push a date past.
+function weekEndStr(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  const daysUntilSunday = (7 - d.getDay()) % 7; // getDay(): 0=Sun..6=Sat
+  return addDaysStr(dateStr, daysUntilSunday);
+}
 // Given a Main list's sorted upcoming send dates, work out where its Clicker
 // list should send: one send gets "the day after"; multiple sends in the
 // same stretch get a Clicker date placed between each consecutive pair (plus
 // one after the last), so remarketing lands in the gaps instead of piling up.
-function computeClickerTargetDates(mainDatesSorted) {
+// weekEnd (optional) caps the trailing "day after last send" target so it
+// never spills into next week's Mon-Sun replan.
+function computeClickerTargetDates(mainDatesSorted, weekEnd) {
   if (!mainDatesSorted.length) return [];
-  if (mainDatesSorted.length === 1) return [addDaysStr(mainDatesSorted[0], 1)];
+  if (mainDatesSorted.length === 1) {
+    const only = addDaysStr(mainDatesSorted[0], 1);
+    return (!weekEnd || only <= weekEnd) ? [only] : [];
+  }
   const targets = [];
   for (let i = 0; i < mainDatesSorted.length - 1; i++) {
     const gap = daysBetweenStr(mainDatesSorted[i], mainDatesSorted[i + 1]);
     if (gap <= 1) continue; // adjacent days — no room between them
     targets.push(addDaysStr(mainDatesSorted[i], Math.round(gap / 2)));
   }
-  targets.push(addDaysStr(mainDatesSorted[mainDatesSorted.length - 1], 1));
+  const lastTarget = addDaysStr(mainDatesSorted[mainDatesSorted.length - 1], 1);
+  if (!weekEnd || lastTarget <= weekEnd) targets.push(lastTarget);
   return targets;
 }
 // Nudges a target date to the nearest day (checking +1,-1,+2,-2…) that isn't
@@ -1997,7 +2013,7 @@ async function autoScheduleClickerPair(mainList) {
     plannedSends.filter(p => p.list === clickerName && p.status === 'Planned' && p.planned_date).map(p => p.planned_date)
   );
 
-  const targets = computeClickerTargetDates(mainDates);
+  const targets = computeClickerTargetDates(mainDates, weekEndStr(today));
   for (const target of targets) {
     const alreadyCovered = [...clickerDatesSet].some(cd => Math.abs(daysBetweenStr(cd, target)) <= 1);
     if (alreadyCovered) continue;
@@ -2065,16 +2081,64 @@ async function dedupePlannedSends() {
   return removed;
 }
 
+// Country picker for "Align Clicker Dates" — deliberately has no "blank =
+// all" fallback. An earlier free-text version of this field silently ran
+// unscoped (every country) whenever it was left blank or reset on reload,
+// which kept re-adding Clicker dates for geos nobody had planned yet. Now
+// nothing runs until at least one country is explicitly checked, and the
+// selection persists in localStorage so it doesn't quietly reset to blank.
+const CLICKER_ALIGN_COUNTRIES_KEY = 'clickerAlignCountriesSelected';
+function getClickerAlignCountries() {
+  try {
+    const raw = localStorage.getItem(CLICKER_ALIGN_COUNTRIES_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+function setClickerAlignCountries(list) {
+  localStorage.setItem(CLICKER_ALIGN_COUNTRIES_KEY, JSON.stringify(list));
+  const label = document.getElementById('clickerAlignCountryLabel');
+  if (label) label.textContent = list.length === 0 ? 'Select countries…' : list.length === 1 ? list[0] : `${list.length} countries`;
+}
+function renderClickerAlignCountryMenu() {
+  const menu = document.getElementById('clickerAlignCountryMenu');
+  if (!menu) return;
+  const known = plannerKnownCountries();
+  const selected = new Set(getClickerAlignCountries());
+  menu.innerHTML = known.map(c => `
+    <label style="display:flex;align-items:center;gap:6px;padding:3px 4px;cursor:pointer;white-space:nowrap">
+      <input type="checkbox" value="${escAttr(c)}" ${selected.has(c) ? 'checked' : ''} onchange="onClickerAlignCountryToggle(this)">
+      <span>${escAttr(c)}</span>
+    </label>
+  `).join('') || '<div style="color:#94A3B8;padding:4px">No countries found yet</div>';
+}
+function onClickerAlignCountryToggle(checkbox) {
+  const current = new Set(getClickerAlignCountries());
+  if (checkbox.checked) current.add(checkbox.value); else current.delete(checkbox.value);
+  setClickerAlignCountries([...current]);
+}
+function toggleClickerAlignCountryMenu(evt) {
+  evt.stopPropagation();
+  const menu = document.getElementById('clickerAlignCountryMenu');
+  if (!menu) return;
+  const opening = menu.style.display === 'none';
+  if (opening) { renderClickerAlignCountryMenu(); menu.style.display = 'block'; }
+  else { menu.style.display = 'none'; }
+}
+document.addEventListener('click', (e) => {
+  const picker = document.getElementById('clickerAlignCountryPicker');
+  const menu = document.getElementById('clickerAlignCountryMenu');
+  if (menu && menu.style.display !== 'none' && picker && !picker.contains(e.target)) menu.style.display = 'none';
+});
+
 async function backfillClickerSchedule() {
-  const scopeRaw = (document.getElementById('clickerAlignCountries')?.value || '').trim();
-  const scope = scopeRaw ? scopeRaw.split(',').map(s => s.trim()).filter(Boolean) : null;
+  const scope = getClickerAlignCountries();
+  if (!scope.length) { alert('Pick at least one country from the 🌍 dropdown before aligning Clicker dates.'); return; }
   const inScope = (list) => {
-    if (!scope) return true;
     const countriesStr = listCountriesOf(list).toLowerCase();
     return scope.some(c => countriesStr.includes(c.toLowerCase()));
   };
 
-  const scopeMsg = scope ? `only for ${scope.join(', ')} — Clicker dates for any other country will be removed` : 'for every country';
+  const scopeMsg = `only for ${scope.join(', ')} — Clicker dates for any other country will be removed`;
   if (!confirm(`This will, ${scopeMsg}:\n• Remove any duplicate planned dates for the same list/day (a list should only send once a day)\n• Remove any auto-scheduled Clicker dates that are already in the past\n• Add Clicker dates for every in-scope Main list currently planned from today onward, spaced between/after those sends — never on the same day as that list's own Main sends\n• Give any other in-scope relevant Clicker list without a Main list driving it a date too\n\nManually-entered dates are never touched. Continue?`)) return;
 
   const dedupedCount = await dedupePlannedSends();
@@ -2117,7 +2181,7 @@ async function backfillClickerSchedule() {
       plannedSends.filter(p => p.list === clickerName && p.status === 'Planned' && p.planned_date).map(p => p.planned_date)
     );
 
-    for (const target of computeClickerTargetDates(mainDates)) {
+    for (const target of computeClickerTargetDates(mainDates, weekEndStr(today))) {
       const alreadyCovered = [...clickerDatesSet].some(cd => Math.abs(daysBetweenStr(cd, target)) <= 1);
       if (alreadyCovered) continue;
       const finalDate = nearestFreeDay(target, mainDatesSet, clickerDatesSet);
@@ -5438,7 +5502,7 @@ function resetFilters() {
   applyFilters();
 }
 
-document.addEventListener('DOMContentLoaded', () => initSupabase());
+document.addEventListener('DOMContentLoaded', () => { initSupabase(); setClickerAlignCountries(getClickerAlignCountries()); });
 </script>
 
 </body>
