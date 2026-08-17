@@ -890,7 +890,7 @@ tbody tr:hover{background:#F8FAFC}
               <button type="button" class="col-toggle" onclick="toggleClickerAlignCountryMenu(event)" title="Pick which country/countries to align Clicker dates for — nothing runs until you pick at least one">🌍 <span id="clickerAlignCountryLabel">Select countries…</span> ▾</button>
               <div id="clickerAlignCountryMenu" style="display:none;position:absolute;top:100%;left:0;margin-top:4px;z-index:50;background:#fff;border:1px solid #E2E8F0;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.15);padding:8px;max-height:280px;overflow-y:auto;min-width:200px;font-size:12px"></div>
             </div>
-            <button class="col-toggle" onclick="backfillClickerSchedule()" title="Fills each Clicker list in the countries picked above on every remaining day this week, skipping only its own Main list's send day(s). Removes auto-scheduled Clicker dates for any country not picked." style="background:#3B82F6;color:#fff;border-color:#3B82F6">🔄 Align Clicker Dates</button>
+            <button id="clickerAlignBtn" class="col-toggle" onclick="backfillClickerSchedule()" title="Fills each Clicker list in the countries picked above on every remaining day this week, skipping only its own Main list's send day(s). Removes auto-scheduled Clicker dates for any country not picked." style="background:#3B82F6;color:#fff;border-color:#3B82F6">🔄 Align Clicker Dates</button>
           </div>
         </div>
         <div id="calendarGrid"></div>
@@ -2102,7 +2102,15 @@ document.addEventListener('click', (e) => {
   if (menu && menu.style.display !== 'none' && picker && !picker.contains(e.target)) menu.style.display = 'none';
 });
 
+// Guards against a second run racing an in-flight one — each list's dates
+// are computed from a plannedSends snapshot taken at the *start* of a run,
+// so two overlapping runs (a fast double-click, or clicking again because
+// the first run hadn't visibly finished yet) each work from a stale
+// snapshot and independently insert the same date, creating duplicate rows.
+let clickerAlignRunning = false;
 async function backfillClickerSchedule() {
+  if (clickerAlignRunning) { alert('Already aligning Clicker dates — hang on for that run to finish.'); return; }
+
   const scope = getClickerAlignCountries();
   if (!scope.length) { alert('Pick at least one country from the 🌍 dropdown before aligning Clicker dates.'); return; }
   const inScope = (list) => {
@@ -2113,6 +2121,19 @@ async function backfillClickerSchedule() {
   const scopeMsg = `only for ${scope.join(', ')} — Clicker dates for any other country will be removed`;
   if (!confirm(`This will, ${scopeMsg}:\n• Remove any duplicate planned dates for the same list/day (a list should only send once a day)\n• Remove any auto-scheduled Clicker dates that are already in the past\n• Fill in-scope Clicker lists on every remaining day this week (today through Sunday) — skipping only the day(s) that list's own Main list sends\n• Cover any other in-scope relevant Clicker list without a Main list driving it the same way\n\nManually-entered dates are never touched. Continue?`)) return;
 
+  clickerAlignRunning = true;
+  const btn = document.getElementById('clickerAlignBtn');
+  const btnLabel = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Aligning…'; }
+  try {
+    await runBackfillClickerSchedule(inScope, scope);
+  } finally {
+    clickerAlignRunning = false;
+    if (btn) { btn.disabled = false; btn.textContent = btnLabel; }
+  }
+}
+
+async function runBackfillClickerSchedule(inScope, scope) {
   const dedupedCount = await dedupePlannedSends();
 
   const today = todayLocalStr();
