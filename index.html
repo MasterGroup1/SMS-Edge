@@ -890,7 +890,7 @@ tbody tr:hover{background:#F8FAFC}
               <button type="button" class="col-toggle" onclick="toggleClickerAlignCountryMenu(event)" title="Pick which country/countries to align Clicker dates for — nothing runs until you pick at least one">🌍 <span id="clickerAlignCountryLabel">Select countries…</span> ▾</button>
               <div id="clickerAlignCountryMenu" style="display:none;position:absolute;top:100%;left:0;margin-top:4px;z-index:50;background:#fff;border:1px solid #E2E8F0;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.15);padding:8px;max-height:280px;overflow-y:auto;min-width:200px;font-size:12px"></div>
             </div>
-            <button id="clickerAlignBtn" class="col-toggle" onclick="backfillClickerSchedule()" title="Fills each Clicker list in the countries picked above on every remaining day this week, skipping only its own Main list's send day(s). Removes auto-scheduled Clicker dates for any country not picked." style="background:#3B82F6;color:#fff;border-color:#3B82F6">🔄 Align Clicker Dates</button>
+            <button id="clickerAlignBtn" class="col-toggle" onclick="backfillClickerSchedule()" title="Schedules Clicker sends per geo per day (7-10/day for 7+-Main-list geos, 2-3/day for smaller ones) for the countries picked above, skipping lists under ~20 estimated people and each list's own Main send day. Removes auto-scheduled Clicker dates for any country not picked." style="background:#3B82F6;color:#fff;border-color:#3B82F6">🔄 Align Clicker Dates</button>
           </div>
         </div>
         <div id="calendarGrid"></div>
@@ -1945,7 +1945,7 @@ function scheduleFromList(list, brand, country) {
 // Editing a "When Used #" date directly in the Master List Planner creates,
 // moves, or removes a planned send — the same underlying planned_sends record
 // the Planner tab reads, so the two stay in sync with no extra step.
-const AUTO_CLICKER_NOTE = 'Auto-scheduled Clicker send (max coverage, avoids its Main send day)';
+const AUTO_CLICKER_NOTE = 'Auto-scheduled Clicker send (geo-capped rotation)';
 function addDaysStr(dateStr, n) {
   const d = new Date(dateStr + 'T00:00:00');
   d.setDate(d.getDate() + n);
@@ -1965,46 +1965,140 @@ function weekDaysFrom(today) {
   for (let d = today; d <= weekEnd; d = addDaysStr(d, 1)) days.push(d);
   return days;
 }
-// Clickers are cheap and highly engaged, so a Clicker list is scheduled on
-// EVERY remaining day this week rather than sparingly — the only days it
-// skips are ones its own Main list already sends on (never compete with your
-// own Main send) and days it's already got a date for (manual or otherwise).
-async function fillClickerWeek(clickerName, mainDatesSet, weekDays) {
-  const clickerDatesSet = new Set(
-    plannedSends.filter(p => p.list === clickerName && p.status === 'Planned' && p.planned_date).map(p => p.planned_date)
+// ── Clicker eligibility & per-geo daily volume caps ───────────────────────
+// Blasting every eligible Clicker list every day is too much volume. Real
+// target: ~40 Clicker sends/day total, split by how much Main volume each
+// geo actually carries — geos with 7+ viable Main lists (e.g. NZ, AU, DE,
+// IT) get 7-10 Clicker sends/day; smaller geos (NO, AT, IE, CH, CA, ...) get
+// 2-3/day. A Clicker list also needs an estimated 20+ people in it to be
+// eligible to send at all — too small and it waits until it grows.
+const CLICKER_MIN_SIZE = 20;
+const CLICKER_TARGET_BIG = 8;   // midpoint of the 7-10/day range
+const CLICKER_TARGET_SMALL = 3; // midpoint of the 2-3/day range
+const CLICKER_BIG_GEO_MAIN_COUNT = 7;
+
+// A list's own average volume per send — the most direct size signal once
+// it's actually gone out at least once. Manual List Size entry always wins
+// if someone's set one.
+function estimatedSize(group) {
+  if (group.listSize) return Number(group.listSize);
+  if (group.camps > 0) return group.sent / group.camps;
+  return null;
+}
+// A Clicker list's size before it's ever been sent on its own: approximated
+// from its paired Main list's average clicks per send, since that's exactly
+// who ends up in the Clicker segment. Falls back to the Clicker list's own
+// send history once it has one — that's the more reliable number once it
+// exists.
+function estimatedClickerSize(clickerGroup) {
+  const own = estimatedSize(clickerGroup);
+  if (own != null) return own;
+  if (clickerGroup.list.endsWith(' - Clickers')) {
+    const mainName = clickerGroup.list.slice(0, -(' - Clickers').length);
+    const mainGroup = filteredListsMain.find(l => l.list === mainName);
+    if (mainGroup && mainGroup.camps > 0) return mainGroup.clicks / mainGroup.camps;
+  }
+  return null;
+}
+function isClickerEligible(cl) {
+  if (cl.reuse === 'No') return false;
+  const size = estimatedClickerSize(cl);
+  return size != null && size >= CLICKER_MIN_SIZE;
+}
+// How many viable Main lists a geo typically carries — the basis for
+// classifying it "big" (7-10 Clicker sends/day) vs "small" (2-3/day).
+function countryMainListCount(country) {
+  return filteredListsMain.filter(l => l.reuse !== 'No' && listCountriesOf(l.list).toLowerCase().includes(country.toLowerCase())).length;
+}
+function clickerDailyTargetFor(country) {
+  return countryMainListCount(country) >= CLICKER_BIG_GEO_MAIN_COUNT ? CLICKER_TARGET_BIG : CLICKER_TARGET_SMALL;
+}
+
+// Schedules up to `country`'s daily target of eligible Clicker lists (drawn
+// from `pool`) for `day` — skipping ones already scheduled that day (manual
+// or auto) and ones whose own Main list sends that same day. Rotates which
+// lists get picked by favoring whichever has had the fewest Clicker sends
+// so far this week, so the same handful don't get reused every single day.
+async function scheduleClickersForCountryDay(country, day, weekDays, pool) {
+  const alreadyTodayForCountry = new Set(
+    plannedSends.filter(p => p.status === 'Planned' && p.planned_date === day && p.list.endsWith(' - Clickers')
+      && listCountriesOf(p.list).toLowerCase().includes(country.toLowerCase())).map(p => p.list)
   );
+  const remaining = clickerDailyTargetFor(country) - alreadyTodayForCountry.size;
+  if (remaining <= 0) return { added: 0, failed: 0, names: [] };
+
+  const usageThisWeek = (list) => plannedSends.filter(p => p.list === list && p.status === 'Planned' && weekDays.includes(p.planned_date)).length;
+
+  const candidates = pool
+    .filter(cl => listCountriesOf(cl.list).toLowerCase().includes(country.toLowerCase()))
+    .filter(cl => {
+      if (alreadyTodayForCountry.has(cl.list)) return false;
+      const mainName = cl.list.slice(0, -(' - Clickers').length);
+      const mainSendsToday = plannedSends.some(p => p.list === mainName && p.status === 'Planned' && p.planned_date === day);
+      return !mainSendsToday;
+    })
+    .sort((a, b) => usageThisWeek(a.list) - usageThisWeek(b.list) || estimatedClickerSize(b) - estimatedClickerSize(a));
+
   let added = 0, failed = 0;
-  for (const day of weekDays) {
-    if (mainDatesSet.has(day) || clickerDatesSet.has(day)) continue;
+  const names = [];
+  for (const cl of candidates.slice(0, remaining)) {
     const newPlan = {
-      _id: crypto.randomUUID(), planned_date: day, list: clickerName, brand: '', country: '',
+      _id: crypto.randomUUID(), planned_date: day, list: cl.list, brand: '', country: '',
       status: 'Planned', notes: AUTO_CLICKER_NOTE, created_at: new Date().toISOString()
     };
     plannedSends.push(newPlan);
     const res = await syncPlannedSend(newPlan._id);
-    if (res.ok) { clickerDatesSet.add(day); added++; }
+    if (res.ok) { added++; names.push(cl.list); }
     else {
       plannedSends = plannedSends.filter(p => p._id !== newPlan._id);
       failed++;
       console.warn('Auto-schedule Clicker date failed to save: ' + res.error);
     }
   }
-  return { added, failed };
+  return { added, failed, names };
 }
 
-// When a Main list's "When Used" date is newly set, fill its Clicker list's
-// dates for every remaining day this week except the Main list's own send
-// days — never touches or removes a Clicker date that's already there
-// (manual or otherwise).
+// When a Main list's "When Used" date is newly set, try to give its Clicker
+// list a date across the rest of this week — same eligibility (size 20+)
+// and per-geo daily cap as the bulk Align pass, so a single manual edit
+// can't blow past that geo's daily target. Never touches or removes a
+// Clicker date that's already there (manual or otherwise).
 async function autoScheduleClickerPair(mainList) {
   const clickerName = mainList + ' - Clickers';
-  if (!filteredListsClickers.find(l => l.list === clickerName)) return; // no matching Clicker list
+  const cl = filteredListsClickers.find(l => l.list === clickerName);
+  if (!cl || !isClickerEligible(cl)) return;
 
   const today = todayLocalStr();
+  const weekDays = weekDaysFrom(today);
   const mainDatesSet = new Set(
     plannedSends.filter(p => p.list === mainList && p.status === 'Planned' && p.planned_date && p.planned_date >= today).map(p => p.planned_date)
   );
-  const { added } = await fillClickerWeek(clickerName, mainDatesSet, weekDaysFrom(today));
+  const countries = (cl.countries || '').split(', ').filter(Boolean);
+  if (!countries.length) return;
+
+  let added = 0;
+  for (const day of weekDays) {
+    if (mainDatesSet.has(day)) continue;
+    const alreadyThisDay = plannedSends.some(p => p.list === clickerName && p.status === 'Planned' && p.planned_date === day);
+    if (alreadyThisDay) continue;
+
+    const country = countries[0];
+    const alreadyTodayForCountry = plannedSends.filter(p => p.status === 'Planned' && p.planned_date === day && p.list.endsWith(' - Clickers')
+      && listCountriesOf(p.list).toLowerCase().includes(country.toLowerCase())).length;
+    if (alreadyTodayForCountry >= clickerDailyTargetFor(country)) continue; // that geo's quota for the day is full
+
+    const newPlan = {
+      _id: crypto.randomUUID(), planned_date: day, list: clickerName, brand: '', country: '',
+      status: 'Planned', notes: AUTO_CLICKER_NOTE, created_at: new Date().toISOString()
+    };
+    plannedSends.push(newPlan);
+    const res = await syncPlannedSend(newPlan._id);
+    if (res.ok) added++;
+    else {
+      plannedSends = plannedSends.filter(p => p._id !== newPlan._id);
+      console.warn('Auto-schedule Clicker date failed to save: ' + res.error);
+    }
+  }
   if (added) refreshListRows(clickerName);
 }
 
@@ -2119,7 +2213,7 @@ async function backfillClickerSchedule() {
   };
 
   const scopeMsg = `only for ${scope.join(', ')} — Clicker dates for any other country will be removed`;
-  if (!confirm(`This will, ${scopeMsg}:\n• Remove any duplicate planned dates for the same list/day (a list should only send once a day)\n• Remove any auto-scheduled Clicker dates that are already in the past\n• Fill in-scope Clicker lists on every remaining day this week (today through Sunday) — skipping only the day(s) that list's own Main list sends\n• Cover any other in-scope relevant Clicker list without a Main list driving it the same way\n\nManually-entered dates are never touched. Continue?`)) return;
+  if (!confirm(`This will, ${scopeMsg}:\n• Remove any duplicate planned dates for the same list/day (a list should only send once a day)\n• Remove any auto-scheduled Clicker dates that are already in the past\n• Schedule Clicker sends per geo per day: 7-10/day for geos with 7+ viable Main lists, 2-3/day for smaller geos — never on a list's own Main send day\n• Skip any Clicker list with an estimated size under 20 (derived from its own send history or its Main list's average clicks per send) until it grows\n• Rotate which Clicker lists get picked so the same ones aren't reused every day\n\nManually-entered dates are never touched. Continue?`)) return;
 
   clickerAlignRunning = true;
   const btn = document.getElementById('clickerAlignBtn');
@@ -2157,33 +2251,22 @@ async function runBackfillClickerSchedule(inScope, scope) {
   }
 
   const weekDays = weekDaysFrom(today);
-  const mainLists = [...new Set(
-    plannedSends.filter(p => p.status === 'Planned' && p.planned_date && p.planned_date >= today && !p.list.endsWith(' - Clickers') && inScope(p.list)).map(p => p.list)
-  )];
-  const usedClickerLists = new Set();
 
-  // Main lists with a planned date this week: give their Clicker list every
-  // remaining day this week except the Main list's own send days.
-  for (const mainList of mainLists) {
-    const clickerName = mainList + ' - Clickers';
-    if (!filteredListsClickers.find(l => l.list === clickerName)) continue;
-    usedClickerLists.add(clickerName);
+  // Every in-scope Clicker list that clears the size bar (20+ estimated) and
+  // isn't marked "No" — the per-day/per-geo cap in scheduleClickersForCountryDay
+  // decides how many of these actually get a date each day, and its own-Main-
+  // send-day check applies uniformly whether or not the Main list has any
+  // dates planned this week.
+  const eligiblePool = filteredListsClickers.filter(cl =>
+    cl.list.endsWith(' - Clickers') && inScope(cl.list) && isClickerEligible(cl)
+  );
 
-    const mainDatesSet = new Set(
-      plannedSends.filter(p => p.list === mainList && p.status === 'Planned' && p.planned_date && p.planned_date >= today).map(p => p.planned_date)
-    );
-    const { added, failed } = await fillClickerWeek(clickerName, mainDatesSet, weekDays);
-    addedCount += added; failedCount += failed;
-    if (added) listsTouched.add(mainList);
-  }
-
-  // Clicker lists worth using that aren't tied to any currently-planned Main
-  // list — no Main send day to dodge, so fill every remaining day this week.
-  for (const cl of filteredListsClickers) {
-    if (usedClickerLists.has(cl.list) || cl.reuse === 'No' || !cl.list.endsWith(' - Clickers') || !inScope(cl.list)) continue;
-    const { added, failed } = await fillClickerWeek(cl.list, new Set(), weekDays);
-    addedCount += added; failedCount += failed;
-    if (added) listsTouched.add(cl.list);
+  for (const day of weekDays) {
+    for (const country of scope) {
+      const { added, failed, names } = await scheduleClickersForCountryDay(country, day, weekDays, eligiblePool);
+      addedCount += added; failedCount += failed;
+      names.forEach(n => listsTouched.add(n));
+    }
   }
 
   recomputeAggregates();
