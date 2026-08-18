@@ -1728,6 +1728,19 @@ tbody tr:hover{background:#F8FAFC}
   <div id="historyModalBody" style="font-size:12px;color:#334155"></div>
 </div>
 
+<div id="dayDetailOverlay" onclick="closeDayDetail()" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.5);z-index:299"></div>
+<div id="dayDetailModal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:10px;box-shadow:0 20px 60px rgba(0,0,0,.25);z-index:300;max-width:640px;width:92%;max-height:75vh;overflow-y:auto;padding:20px">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+    <div style="font-size:14px;font-weight:700;color:#0F172A" id="dayDetailTitle"></div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <button id="dayDetailExportBtn" class="col-toggle" style="font-size:11px">⬇ Export CSV</button>
+      <button onclick="closeDayDetail()" style="border:none;background:transparent;font-size:18px;cursor:pointer;color:#94A3B8">×</button>
+    </div>
+  </div>
+  <div id="dayDetailSummary" style="font-size:12px;color:#64748B;margin-bottom:12px"></div>
+  <div id="dayDetailBody"></div>
+</div>
+
 <script>
 // ── SUPABASE ──────────────────────────────────────────────────
 const SB_URL = 'https://eysbtgozvqpfaudfcpsg.supabase.co';
@@ -2406,7 +2419,7 @@ function renderPlannerCalendar() {
     const chips = plans.map(p => {
       const color = p.status === 'Sent' ? '#16A34A' : p.status === 'Cancelled' ? '#94A3B8' : '#2563EB';
       const label = (p.list.length > 16 ? p.list.slice(0, 16) + '…' : p.list) + (p.brand ? ' · ' + p.brand : '');
-      return `<div title="${escAttr(p.list)} — ${escAttr(p.brand||'')} — ${escAttr(p.country||'')} — ${p.status}${p.notes ? ' — ' + escAttr(p.notes) : ''}" style="background:${color};color:#fff;border-radius:3px;padding:1px 4px;font-size:10px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer" onclick="switchPlannerSubtab('planner-table');document.getElementById('plannerSearch').value='${escAttr(p.list)}';onPlannerFilterChange();">${escAttr(label)}</div>`;
+      return `<div title="${escAttr(p.list)} — ${escAttr(p.brand||'')} — ${escAttr(p.country||'')} — ${p.status}${p.notes ? ' — ' + escAttr(p.notes) : ''}" style="background:${color};color:#fff;border-radius:3px;padding:1px 4px;font-size:10px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer" onclick="event.stopPropagation();switchPlannerSubtab('planner-table');document.getElementById('plannerSearch').value='${escAttr(p.list)}';onPlannerFilterChange();">${escAttr(label)}</div>`;
     }).join('');
 
     // Estimated cost for the day: each planned list's historical average
@@ -2424,13 +2437,103 @@ function renderPlannerCalendar() {
       dayTitle = `Estimated cost for ${dateStr}: ${fmtC2(total)}\n` + lines.join('\n');
     }
 
-    html += `<div title="${escAttr(dayTitle)}" style="background:#fff;min-height:80px;padding:4px;${isToday?'box-shadow:inset 0 0 0 2px #0EA5E9;':''}${inMonth?'':'opacity:.35'}">
+    const clickable = inMonth && plans.length > 0;
+    html += `<div title="${escAttr(dayTitle)}" ${clickable ? `onclick="openDayDetail('${dateStr}')"` : ''} style="background:#fff;min-height:80px;padding:4px;${isToday?'box-shadow:inset 0 0 0 2px #0EA5E9;':''}${inMonth?'':'opacity:.35'}${clickable?';cursor:pointer':''}">
       <div style="font-size:11px;font-weight:${isToday?'700':'600'};color:${isToday?'#0EA5E9':'#334155'}">${inMonth ? dayNum : ''}</div>
       ${chips}
     </div>`;
   }
   html += '</div>';
   grid.innerHTML = html;
+}
+
+// A list's estimated send volume for the given day: Clicker lists use
+// estimatedClickerSize (own send history, else paired Main's avg clicks),
+// Main lists use estimatedSize (own send history) — same logic already
+// driving Clicker Align eligibility, reused here so the numbers agree.
+function estimatedVolumeFor(lg) {
+  if (!lg) return null;
+  return lg.list.endsWith(' - Clickers') ? estimatedClickerSize(lg) : estimatedSize(lg);
+}
+
+// Everything planned for one calendar day, plus totals — shared by the day
+// detail modal and the CSV export so the two can never show different
+// numbers. Deliberately ignores the calendar's brand filter: clicking a day
+// is a request to see everything sending that day, not a filtered subset.
+function getDayPlanRows(dateStr) {
+  const rows = plannedSends
+    .filter(p => p.planned_date === dateStr)
+    .map(p => {
+      const lg = filteredLists.find(l => l.list === p.list);
+      return {
+        list: p.list,
+        country: (lg && lg.countries) || p.country || '',
+        type: p.list.endsWith(' - Clickers') ? 'Clicker' : 'Main',
+        volume: estimatedVolumeFor(lg),
+        cost: lg ? lg.cost_per_camp : null
+      };
+    })
+    .sort((a, b) => (b.cost || 0) - (a.cost || 0));
+  const totalVolume = rows.reduce((s, r) => s + (r.volume || 0), 0);
+  const totalCost = rows.reduce((s, r) => s + (r.cost || 0), 0);
+  return { rows, totalVolume, totalCost };
+}
+
+function openDayDetail(dateStr) {
+  const { rows, totalVolume, totalCost } = getDayPlanRows(dateStr);
+  document.getElementById('dayDetailTitle').textContent = new Date(dateStr + 'T00:00:00')
+    .toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  document.getElementById('dayDetailSummary').textContent =
+    `${rows.length} list${rows.length === 1 ? '' : 's'} · ~${Math.round(totalVolume).toLocaleString()} estimated sends · ${fmtC2(totalCost)} estimated cost`;
+
+  const body = document.getElementById('dayDetailBody');
+  body.innerHTML = rows.length ? `
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead><tr style="text-align:left;border-bottom:1px solid #E2E8F0;color:#64748B">
+        <th style="padding:6px 8px 6px 0">List</th>
+        <th style="padding:6px 8px">Country</th>
+        <th style="padding:6px 8px">Type</th>
+        <th style="padding:6px 8px;text-align:right">Est. Sends</th>
+        <th style="padding:6px 0;text-align:right">Est. Cost</th>
+      </tr></thead>
+      <tbody>
+        ${rows.map(r => `<tr style="border-bottom:1px solid #F1F5F9">
+          <td style="padding:6px 8px 6px 0">${escAttr(r.list)}</td>
+          <td style="padding:6px 8px;color:#64748B">${escAttr(r.country)}</td>
+          <td style="padding:6px 8px"><span style="font-size:10px;font-weight:600;padding:1px 6px;border-radius:10px;background:${r.type === 'Clicker' ? '#EFF6FF' : '#F0FDF4'};color:${r.type === 'Clicker' ? '#2563EB' : '#16A34A'}">${r.type}</span></td>
+          <td style="padding:6px 8px;text-align:right">${r.volume != null ? Math.round(r.volume).toLocaleString() : '—'}</td>
+          <td style="padding:6px 0;text-align:right">${r.cost != null ? fmtC2(r.cost) : '—'}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>` : '<div style="color:#94A3B8;padding:8px 0">Nothing planned for this day.</div>';
+
+  document.getElementById('dayDetailExportBtn').onclick = () => exportDayCSV(dateStr);
+  document.getElementById('dayDetailOverlay').style.display = 'block';
+  document.getElementById('dayDetailModal').style.display = 'block';
+}
+
+function closeDayDetail() {
+  document.getElementById('dayDetailOverlay').style.display = 'none';
+  document.getElementById('dayDetailModal').style.display = 'none';
+}
+
+function exportDayCSV(dateStr) {
+  const { rows, totalVolume, totalCost } = getDayPlanRows(dateStr);
+  const esc = (v) => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
+  const lines = [
+    ['List Name', 'Country', 'Type', 'Est. Send Volume', 'Est. Cost'].map(esc).join(','),
+    ...rows.map(r => [r.list, r.country, r.type, r.volume != null ? Math.round(r.volume) : '', r.cost != null ? r.cost.toFixed(2) : ''].map(esc).join(',')),
+    ['TOTAL', '', '', Math.round(totalVolume), totalCost.toFixed(2)].map(esc).join(',')
+  ];
+  const blob = new Blob([lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `planner-${dateStr}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 function onPlannerFilterChange() {
