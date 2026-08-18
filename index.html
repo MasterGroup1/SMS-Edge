@@ -3180,15 +3180,18 @@ let registeredLists = [
   // One source-inventory country typo fixed: Roy Boy_DE_15082026_batch1 -
   // Clickers was listed as Italy, corrected to Germany to match its batch
   // siblings and its Main list counterpart.
-  {list:'FortunePlay_AU_25082025_Batch1_10K', country:'Australia', partner:'', type:'Fresh'},
-  {list:'FortunePlay_IT_25082025_Batch1_10K', country:'Italy', partner:'', type:'Fresh'},
+  // FortunePlay_AU/IT, LuckyVibe_IT, PlayMojo_IT, and Rollero_IT (source file
+  // had it corrupted to "RolleIT") 25082025_Batch1_10K were dropped here —
+  // FortunePlay/LuckyVibe/PlayMojo/Rollero are sending-route brand names (see
+  // the ROUTE_LABELS-style map above, ~line 5341), not partners. Roy
+  // Boy_AU_25082025_Batch1_10K and Roy Boy_IT_25082025_Batch1_10K already
+  // exist with real campaign data for the same country/date/batch, so these
+  // route-prefixed rows are the same list sent through a different route, not
+  // separate lists — kept as the single Roy Boy entry instead of duplicating.
   {list:'Hanni_13052026_NO_Batch 2_3.5K', country:'Norway', partner:'Lilly', type:'Fresh'},
   {list:'Lilly_DE_07112025_Batch1_10K', country:'Germany', partner:'Lilly', type:'Fresh'},
   {list:'Lilly_DE_25082025_Batch1_10K', country:'Germany', partner:'Lilly', type:'Fresh'},
-  {list:'LuckyVibe_IT_25082025_Batch1_10K', country:'Italy', partner:'', type:'Fresh'},
   {list:'NZ_Rolle22425_SMSEdge', country:'New Zealand', partner:'', type:'Fresh'},
-  {list:'PlayMojo_IT_25082025_Batch1_10K', country:'Italy', partner:'', type:'Fresh'},
-  {list:'RolleIT_25082025_Batch1_10K', country:'Italy', partner:'', type:'Fresh'},
   {list:'Roy Boy_AT_15082026_batch2', country:'Austria', partner:'Roy Boy', type:'Fresh'},
   {list:'Roy Boy_AT_15082026_batch3', country:'Austria', partner:'Roy Boy', type:'Fresh'},
   {list:'Roy Boy_AT_15082026_batch4', country:'Austria', partner:'Roy Boy', type:'Fresh'},
