@@ -890,7 +890,7 @@ tbody tr:hover{background:#F8FAFC}
               <button type="button" class="col-toggle" onclick="toggleClickerAlignCountryMenu(event)" title="Pick which country/countries to align Clicker dates for — nothing runs until you pick at least one">🌍 <span id="clickerAlignCountryLabel">Select countries…</span> ▾</button>
               <div id="clickerAlignCountryMenu" style="display:none;position:absolute;top:100%;left:0;margin-top:4px;z-index:50;background:#fff;border:1px solid #E2E8F0;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.15);padding:8px;max-height:280px;overflow-y:auto;min-width:200px;font-size:12px"></div>
             </div>
-            <button id="clickerAlignBtn" class="col-toggle" onclick="backfillClickerSchedule()" title="Schedules Clicker sends per geo per day (7-10/day for 7+-Main-list geos, 2-3/day for smaller ones) for the countries picked above, skipping lists under ~20 estimated people and each list's own Main send day. Removes auto-scheduled Clicker dates for any country not picked." style="background:#3B82F6;color:#fff;border-color:#3B82F6">🔄 Align Clicker Dates</button>
+            <button id="clickerAlignBtn" class="col-toggle" onclick="backfillClickerSchedule()" title="Schedules Clicker sends per geo per day (7-10/day for 7+-Main-list geos, 2-3/day for smaller ones) for the countries picked above, skipping lists under ~20 estimated people and each list's own Main send day. Purely additive — countries not picked are left exactly as they are." style="background:#3B82F6;color:#fff;border-color:#3B82F6">🔄 Align Clicker Dates</button>
           </div>
         </div>
         <div id="calendarGrid"></div>
@@ -2225,8 +2225,8 @@ async function backfillClickerSchedule() {
     return scope.some(c => countriesStr.includes(c.toLowerCase()));
   };
 
-  const scopeMsg = `only for ${scope.join(', ')} — Clicker dates for any other country will be removed`;
-  if (!confirm(`This will, ${scopeMsg}:\n• Remove any duplicate planned dates for the same list/day (a list should only send once a day)\n• Remove any auto-scheduled Clicker dates that are already in the past\n• Schedule Clicker sends per geo per day: 7-10/day for geos with 7+ viable Main lists, 2-3/day for smaller geos — never on a list's own Main send day\n• Skip any Clicker list with an estimated size under 20 (derived from its own send history or its Main list's average clicks per send) until it grows\n• Rotate which Clicker lists get picked so the same ones aren't reused every day\n\nManually-entered dates are never touched. Continue?`)) return;
+  const scopeMsg = `only for ${scope.join(', ')}`;
+  if (!confirm(`This will, ${scopeMsg}:\n• Remove any duplicate planned dates for the same list/day (a list should only send once a day)\n• Remove any auto-scheduled Clicker dates that are already in the past\n• Schedule Clicker sends per geo per day: 7-10/day for geos with 7+ viable Main lists, 2-3/day for smaller geos — never on a list's own Main send day\n• Skip any Clicker list with an estimated size under 20 (derived from its own send history or its Main list's average clicks per send) until it grows\n• Rotate which Clicker lists get picked so the same ones aren't reused every day\n\nOther countries' auto-scheduled Clicker dates are left alone even if they're not checked above — this only adds for what's checked, it never removes anything outside the past-date cleanup. Manually-entered dates are never touched either way. Continue?`)) return;
 
   clickerAlignRunning = true;
   const btn = document.getElementById('clickerAlignBtn');
@@ -2247,20 +2247,20 @@ async function runBackfillClickerSchedule(inScope, scope) {
   let removedCount = 0, addedCount = 0, failedCount = 0;
   const listsTouched = new Set();
 
-  // Always drop past auto-scheduled dates; when scoped, also drop future
-  // auto-scheduled dates for lists outside the current scope (Clicker or
-  // Main-list-adjacent) so re-running with a narrower scope actually narrows.
-  let removedPastCount = 0, removedOutOfScopeCount = 0;
+  // Only drop past auto-scheduled dates — no point remarketing against a
+  // send that already happened. Deliberately does NOT touch auto-scheduled
+  // dates for countries outside the current scope: aligning IT, then later
+  // aligning only DE, must leave IT's Clicker dates exactly as they were.
+  // Each align run is purely additive for whatever's checked; the only way
+  // to remove a country's Clicker dates is to do that on purpose elsewhere.
+  let removedPastCount = 0;
   const toRemove = plannedSends.filter(p =>
-    p.notes === AUTO_CLICKER_NOTE && p.planned_date && (p.planned_date < today || !inScope(p.list))
+    p.notes === AUTO_CLICKER_NOTE && p.planned_date && p.planned_date < today
   );
   for (const p of toRemove) {
     plannedSends = plannedSends.filter(x => x._id !== p._id);
     const ok = sb ? !(await sb.from('planned_sends').delete().eq('id', p._id)).error : true;
-    if (ok) {
-      removedCount++;
-      if (p.planned_date < today) removedPastCount++; else removedOutOfScopeCount++;
-    }
+    if (ok) { removedCount++; removedPastCount++; }
   }
 
   const weekDays = weekDaysFrom(today);
@@ -2291,7 +2291,6 @@ async function runBackfillClickerSchedule(inScope, scope) {
   const parts = [];
   if (dedupedCount) parts.push(`removed ${dedupedCount} duplicate planned date(s)`);
   if (removedPastCount) parts.push(`removed ${removedPastCount} past auto-scheduled date(s)`);
-  if (removedOutOfScopeCount) parts.push(`removed ${removedOutOfScopeCount} out-of-scope auto-scheduled date(s)`);
   if (addedCount) parts.push(`added ${addedCount} Clicker date(s) across ${listsTouched.size} list(s)`);
   if (failedCount) parts.push(`${failedCount} failed to save — check your connection`);
   alert(parts.length ? parts.join('; ') + '.' : 'Nothing to change — everything is already aligned.');
