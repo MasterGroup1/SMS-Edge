@@ -3435,7 +3435,38 @@ let registeredLists = [
   {list:'Roy Boy_NO_15082026_batch1 - Clickers', country:'Norway', partner:'Roy Boy', type:'Clicked'},
   {list:'Roy Boy_NO_15082026_batch2 - Clickers', country:'Norway', partner:'Roy Boy', type:'Clicked'},
   {list:'Roy Boy_NO_15082026_batch3 - Clickers', country:'Norway', partner:'Roy Boy', type:'Clicked'},
-  {list:'Roy Boy_NO_15082026_batch4 - Clickers', country:'Norway', partner:'Roy Boy', type:'Clicked'}
+  {list:'Roy Boy_NO_15082026_batch4 - Clickers', country:'Norway', partner:'Roy Boy', type:'Clicked'},
+  // Second inventory reconciliation pass — new 23082026 batches, including
+  // Roy Boy's first-ever Spain and France lists. No new Clicker lists in
+  // this pass (the source Clickers sheet has no 23082026/ES/FR entries
+  // yet — those Clicker segments don't exist until these Main lists send
+  // and generate click data). Same exclusions as the prior pass applied
+  // again: junk "XX Clicked ..." buckets, hyphen-spacing duplicates of
+  // already-registered Consol/SMS Data lists, and the route-brand-name
+  // duplicates (FortunePlay/LuckyVibe/PlayMojo/Rollero).
+  {list:'Roy Boy_AT_23082026_batch1', country:'Austria', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_AT_23082026_batch2', country:'Austria', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_AT_23082026_batch3', country:'Austria', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_AT_23082026_batch4', country:'Austria', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_AT_23082026_batch5', country:'Austria', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_DE_23082026_batch10', country:'Germany', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_DE_23082026_batch4', country:'Germany', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_DE_23082026_batch5', country:'Germany', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_DE_23082026_batch6', country:'Germany', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_DE_23082026_batch7', country:'Germany', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_DE_23082026_batch8', country:'Germany', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_DE_23082026_batch9', country:'Germany', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_ES_23082026_batch1', country:'Spain', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_ES_23082026_batch2', country:'Spain', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_FR_23082026_batch1', country:'France', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_FR_23082026_batch2', country:'France', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_IT_23082026_batch10', country:'Italy', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_IT_23082026_batch4', country:'Italy', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_IT_23082026_batch5', country:'Italy', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_IT_23082026_batch6', country:'Italy', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_IT_23082026_batch7', country:'Italy', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_IT_23082026_batch8', country:'Italy', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_IT_23082026_batch9', country:'Italy', partner:'Roy Boy', type:'Fresh'}
 ];
 registeredLists.forEach(r => { r._id = crypto.randomUUID(); });
 
