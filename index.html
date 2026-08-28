@@ -3920,14 +3920,25 @@ function recomputeAggregates() {
     const bg = brandGroups[c.brand];
     bg.camps += 1; bg.sent += c.sent; bg.clicks += c.clicks; bg.leads += c.leads; bg.sales += c.sales; bg.cost += c.cost;
 
-    // List grouping — one row per LIST only, not per Brand/Country. Use Again
-    // decisions are made about the physical list itself; which brand it's sent
-    // under for a given week is decided separately in the Planner, so brand is
-    // deliberately not part of this grouping. Normalize key so "Royboy_AU_..."
-    // and "Roy Boy_AU_..." merge. Uses c.list (not c.rawList) so Clicked/
-    // "Clickers" resends are included too — their CSV row has a blank List
-    // Name, so c.list falls back to the campaign name. The key is type-prefixed
-    // so a Clicker retargeting segment can never merge with a same-named main list.
+  });
+
+  // List Performance (Master List Planner / Clicker Lists / Use Again
+  // decisions) is always built from the FULL lifetime campaigns array, never
+  // from the date-filtered filteredCampaigns above. Reuse verdicts, ROI, and
+  // ECPA need a list's whole send history to mean anything — judging a list
+  // off whatever date range happens to be selected up top would silently
+  // change its "Use Again?" answer depending on an unrelated filter, and
+  // could wrongly reset a proven list back to "camps < 3 → Yes" just because
+  // this month's slice of its history is thin.
+  // One row per LIST only, not per Brand/Country — Use Again decisions are
+  // made about the physical list itself; which brand it's sent under for a
+  // given week is decided separately in the Planner, so brand is deliberately
+  // not part of this grouping. Normalize key so "Royboy_AU_..." and
+  // "Roy Boy_AU_..." merge. Uses c.list (not c.rawList) so Clicked/"Clickers"
+  // resends are included too — their CSV row has a blank List Name, so
+  // c.list falls back to the campaign name. The key is type-prefixed so a
+  // Clicker retargeting segment can never merge with a same-named main list.
+  campaigns.forEach(c => {
     const nList = c.list ? normalizeListName(c.list) : '';
     if (nList) {
       // Keep the campaign's rawList in sync with normalised form
