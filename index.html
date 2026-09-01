@@ -890,7 +890,7 @@ tbody tr:hover{background:#F8FAFC}
               <button type="button" class="col-toggle" onclick="toggleClickerAlignCountryMenu(event)" title="Pick which country/countries to align Clicker dates for — nothing runs until you pick at least one">🌍 <span id="clickerAlignCountryLabel">Select countries…</span> ▾</button>
               <div id="clickerAlignCountryMenu" style="display:none;position:absolute;top:100%;left:0;margin-top:4px;z-index:50;background:#fff;border:1px solid #E2E8F0;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.15);padding:8px;max-height:280px;overflow-y:auto;min-width:200px;font-size:12px"></div>
             </div>
-            <button id="clickerAlignBtn" class="col-toggle" onclick="backfillClickerSchedule()" title="Schedules Clicker sends per geo per day (7-10/day for 7+-Main-list geos, 2-3/day for smaller ones) for the countries picked above, skipping lists under ~20 estimated people and each list's own Main send day. Purely additive — countries not picked are left exactly as they are." style="background:#3B82F6;color:#fff;border-color:#3B82F6">🔄 Align Clicker Dates</button>
+            <button id="clickerAlignBtn" class="col-toggle" onclick="backfillClickerSchedule()" title="Schedules Clicker sends per geo per day (7-10/day for 7+-Main-list geos, 2-3/day for smaller ones), prioritizing top-performing Main lists' Clickers. Never same day as its Main, never two days running. A never-sent Clicker needs 40+ estimated people and a converting Main list; an already-used one just needs 20+. Purely additive — countries not picked are left exactly as they are." style="background:#3B82F6;color:#fff;border-color:#3B82F6">🔄 Align Clicker Dates</button>
           </div>
         </div>
         <div id="calendarGrid"></div>
@@ -1983,9 +1983,10 @@ function weekDaysFrom(today) {
 // target: ~40 Clicker sends/day total, split by how much Main volume each
 // geo actually carries — geos with 7+ viable Main lists (e.g. NZ, AU, DE,
 // IT) get 7-10 Clicker sends/day; smaller geos (NO, AT, IE, CH, CA, ...) get
-// 2-3/day. A Clicker list also needs an estimated 20+ people in it to be
-// eligible to send at all — too small and it waits until it grows.
-const CLICKER_MIN_SIZE = 20;
+// 2-3/day.
+const CLICKER_MIN_SIZE = 20;         // floor once a Clicker list has its own send history
+const CLICKER_MIN_SIZE_UNTESTED = 40; // higher bar for a Clicker list that's never been sent — no track record yet, so it needs more scale to be worth the first try
+const CLICKER_MIN_GAP_DAYS = 1;      // "every 3rd day": sent Monday → earliest again is Wednesday, never the very next day
 const CLICKER_TARGET_BIG = 8;   // midpoint of the 7-10/day range
 const CLICKER_TARGET_SMALL = 3; // midpoint of the 2-3/day range
 const CLICKER_BIG_GEO_MAIN_COUNT = 7;
@@ -1998,6 +1999,11 @@ function estimatedSize(group) {
   if (group.camps > 0) return group.sent / group.camps;
   return null;
 }
+function mainGroupFor(clickerGroup) {
+  if (!clickerGroup.list.endsWith(' - Clickers')) return null;
+  const mainName = clickerGroup.list.slice(0, -(' - Clickers').length);
+  return filteredListsMain.find(l => l.list === mainName) || null;
+}
 // A Clicker list's size before it's ever been sent on its own: approximated
 // from its paired Main list's average clicks per send, since that's exactly
 // who ends up in the Clicker segment. Falls back to the Clicker list's own
@@ -2006,17 +2012,40 @@ function estimatedSize(group) {
 function estimatedClickerSize(clickerGroup) {
   const own = estimatedSize(clickerGroup);
   if (own != null) return own;
-  if (clickerGroup.list.endsWith(' - Clickers')) {
-    const mainName = clickerGroup.list.slice(0, -(' - Clickers').length);
-    const mainGroup = filteredListsMain.find(l => l.list === mainName);
-    if (mainGroup && mainGroup.camps > 0) return mainGroup.clicks / mainGroup.camps;
-  }
+  const mainGroup = mainGroupFor(clickerGroup);
+  if (mainGroup && mainGroup.camps > 0) return mainGroup.clicks / mainGroup.camps;
   return null;
+}
+// The Main list's clicks turned into nobody — leads or FTDs. Since a Clicker
+// list is that exact same audience, sending to it again is pointless
+// regardless of how "engaged" the clicks looked.
+function mainConvertedPoorly(mainGroup) {
+  return mainGroup.reuse === 'No' || (mainGroup.clicks > 0 && mainGroup.leads <= 0 && mainGroup.sales <= 0);
 }
 function isClickerEligible(cl) {
   if (cl.reuse === 'No') return false;
   const size = estimatedClickerSize(cl);
-  return size != null && size >= CLICKER_MIN_SIZE;
+  if (size == null) return false;
+
+  if (cl.camps === 0) {
+    // Untested Clicker list: needs real scale AND evidence its own Main
+    // list is actually worth retargeting — clicks with zero registrations
+    // or FTDs means the audience already showed it doesn't convert, so
+    // there's no point testing the Clicker side of it either.
+    const mainGroup = mainGroupFor(cl);
+    if (!mainGroup) return false;
+    if (mainConvertedPoorly(mainGroup)) return false;
+    return size >= CLICKER_MIN_SIZE_UNTESTED;
+  }
+  return size >= CLICKER_MIN_SIZE;
+}
+// Ranking signal for "top performing Main list" — ROI of the paired Main
+// list when we have one, falling back to the Clicker list's own ROI for the
+// rare Clicker with no Main list counterpart on record.
+function clickerPerformanceScore(cl) {
+  const mainGroup = mainGroupFor(cl);
+  if (mainGroup) return mainGroup.roi;
+  return typeof cl.roi === 'number' ? cl.roi : -Infinity;
 }
 // How many viable Main lists a geo typically carries — the basis for
 // classifying it "big" (7-10 Clicker sends/day) vs "small" (2-3/day).
@@ -2026,12 +2055,25 @@ function countryMainListCount(country) {
 function clickerDailyTargetFor(country) {
   return countryMainListCount(country) >= CLICKER_BIG_GEO_MAIN_COUNT ? CLICKER_TARGET_BIG : CLICKER_TARGET_SMALL;
 }
+// True if `list` was already sent (or is already scheduled) within
+// CLICKER_MIN_GAP_DAYS days before `day` — the "not two days in a row"
+// cadence gate, mirroring how Main lists themselves land every 3rd day
+// (Monday → Wednesday, never Monday → Tuesday).
+function clickerSentTooRecentlyFor(list, day) {
+  for (let back = 1; back <= CLICKER_MIN_GAP_DAYS; back++) {
+    const checkDay = addDaysStr(day, -back);
+    if (plannedSends.some(p => p.list === list && p.planned_date === checkDay && p.status !== 'Cancelled')) return true;
+  }
+  return false;
+}
 
 // Schedules up to `country`'s daily target of eligible Clicker lists (drawn
 // from `pool`) for `day` — skipping ones already scheduled that day (manual
-// or auto) and ones whose own Main list sends that same day. Rotates which
-// lists get picked by favoring whichever has had the fewest Clicker sends
-// so far this week, so the same handful don't get reused every single day.
+// or auto), ones whose own Main list sends that same day, and ones sent too
+// recently to respect the every-3rd-day cadence. Ranks candidates by their
+// Main list's performance first (top performers get first pick of the
+// day's slots), then by fewest Clicker sends so far this week as a
+// tiebreak so equally-good lists still rotate rather than one dominating.
 async function scheduleClickersForCountryDay(country, day, weekDays, pool) {
   const alreadyTodayForCountry = new Set(
     plannedSends.filter(p => p.status === 'Planned' && p.planned_date === day && p.list.endsWith(' - Clickers')
@@ -2046,11 +2088,12 @@ async function scheduleClickersForCountryDay(country, day, weekDays, pool) {
     .filter(cl => listCountriesOf(cl.list).toLowerCase().includes(country.toLowerCase()))
     .filter(cl => {
       if (alreadyTodayForCountry.has(cl.list)) return false;
+      if (clickerSentTooRecentlyFor(cl.list, day)) return false;
       const mainName = cl.list.slice(0, -(' - Clickers').length);
       const mainSendsToday = plannedSends.some(p => p.list === mainName && p.status === 'Planned' && p.planned_date === day);
       return !mainSendsToday;
     })
-    .sort((a, b) => usageThisWeek(a.list) - usageThisWeek(b.list) || estimatedClickerSize(b) - estimatedClickerSize(a));
+    .sort((a, b) => clickerPerformanceScore(b) - clickerPerformanceScore(a) || usageThisWeek(a.list) - usageThisWeek(b.list) || estimatedClickerSize(b) - estimatedClickerSize(a));
 
   let added = 0, failed = 0;
   const names = [];
@@ -2072,9 +2115,10 @@ async function scheduleClickersForCountryDay(country, day, weekDays, pool) {
 }
 
 // When a Main list's "When Used" date is newly set, try to give its Clicker
-// list a date across the rest of this week — same eligibility (size 20+)
-// and per-geo daily cap as the bulk Align pass, so a single manual edit
-// can't blow past that geo's daily target. Never touches or removes a
+// list a date across the rest of this week — same eligibility (size/Main-
+// performance gates), every-3rd-day cadence, and per-geo daily cap as the
+// bulk Align pass, so a single manual edit can't blow past that geo's daily
+// target or send the Clicker two days running. Never touches or removes a
 // Clicker date that's already there (manual or otherwise).
 async function autoScheduleClickerPair(mainList) {
   const clickerName = mainList + ' - Clickers';
@@ -2094,6 +2138,7 @@ async function autoScheduleClickerPair(mainList) {
     if (mainDatesSet.has(day)) continue;
     const alreadyThisDay = plannedSends.some(p => p.list === clickerName && p.status === 'Planned' && p.planned_date === day);
     if (alreadyThisDay) continue;
+    if (clickerSentTooRecentlyFor(clickerName, day)) continue;
 
     const country = countries[0];
     const alreadyTodayForCountry = plannedSends.filter(p => p.status === 'Planned' && p.planned_date === day && p.list.endsWith(' - Clickers')
@@ -2226,7 +2271,7 @@ async function backfillClickerSchedule() {
   };
 
   const scopeMsg = `only for ${scope.join(', ')}`;
-  if (!confirm(`This will, ${scopeMsg}:\n• Remove any duplicate planned dates for the same list/day (a list should only send once a day)\n• Remove any auto-scheduled Clicker dates that are already in the past\n• Schedule Clicker sends per geo per day: 7-10/day for geos with 7+ viable Main lists, 2-3/day for smaller geos — never on a list's own Main send day\n• Skip any Clicker list with an estimated size under 20 (derived from its own send history or its Main list's average clicks per send) until it grows\n• Rotate which Clicker lists get picked so the same ones aren't reused every day\n\nOther countries' auto-scheduled Clicker dates are left alone even if they're not checked above — this only adds for what's checked, it never removes anything outside the past-date cleanup. Manually-entered dates are never touched either way. Continue?`)) return;
+  if (!confirm(`This will, ${scopeMsg}:\n• Remove any duplicate planned dates for the same list/day (a list should only send once a day)\n• Remove any auto-scheduled Clicker dates that are already in the past\n• Schedule Clicker sends per geo per day: 7-10/day for geos with 7+ viable Main lists, 2-3/day for smaller geos — never on a list's own Main send day, never two days in a row (every 3rd day, like Main sends)\n• Prioritize Clicker lists whose Main list is performing well; a never-sent Clicker needs 40+ estimated people AND a Main list that's actually converting (leads/FTDs, not just clicks) — a Main list with clicks but zero registrations gets skipped entirely\n• Once a Clicker list has its own send history, it just needs to stay above 20 estimated people\n\nOther countries' auto-scheduled Clicker dates are left alone even if they're not checked above — this only adds for what's checked, it never removes anything outside the past-date cleanup. Manually-entered dates are never touched either way. Continue?`)) return;
 
   clickerAlignRunning = true;
   const btn = document.getElementById('clickerAlignBtn');
