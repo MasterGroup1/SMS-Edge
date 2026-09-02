@@ -5205,18 +5205,25 @@ function sortTable(tableId, col, direction) {
     rows.forEach(r => tbody.appendChild(r));
   }
 
-  // Update header indicators
+  // Update header indicators. Written to a dedicated .sort-indicator span
+  // rather than via th.textContent — textContent wipes ALL child nodes,
+  // which was silently deleting the "⋮" column-filter icon (and its click
+  // handler) that attachColumnFilters() appends to each th, breaking that
+  // column's filter the first time it got sorted.
   table.querySelectorAll('th').forEach((th, idx) => {
     th.style.background = idx === col ? '#E0E7FF' : '#F8FAFC';
+    let indicatorEl = th.querySelector('.sort-indicator');
+    if (idx === col) {
+      if (!indicatorEl) {
+        indicatorEl = document.createElement('span');
+        indicatorEl.className = 'sort-indicator';
+        th.insertBefore(indicatorEl, th.querySelector('.col-filter-icon'));
+      }
+      indicatorEl.textContent = isAsc ? ' ▼' : ' ▲';
+    } else if (indicatorEl) {
+      indicatorEl.textContent = '';
+    }
   });
-
-  // Add sort indicator
-  const currentTh = table.querySelectorAll('th')[col];
-  if (currentTh) {
-    currentTh.textContent = currentTh.textContent.replace(/ [▲▼]/g, '');
-    const indicator = isAsc ? ' ▼' : ' ▲';
-    currentTh.textContent += indicator;
-  }
 
   table.dataset.sortCol = col;
   table.dataset.sortAsc = isAsc ? 'false' : 'true';
