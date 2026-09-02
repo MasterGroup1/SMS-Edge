@@ -5147,14 +5147,38 @@ function initContentChart() {
 }
 
 // ── HELPER FUNCTIONS ───────────────────────
+// A plain numeric strip (parseFloat on digits/dots/dashes) mangles ISO dates
+// like "2026-08-25" — it stops at the first "-" after the year and returns
+// just 2026, so every date in the same year compares equal instead of
+// sorting chronologically. ISO dates sort correctly as plain strings, so
+// they're compared that way instead of being run through the numeric path.
+function looksLikeIsoDate(v) {
+  return /^\d{4}-\d{2}-\d{2}/.test(v);
+}
+function compareCellValues(aVal, bVal) {
+  if (looksLikeIsoDate(aVal) && looksLikeIsoDate(bVal)) return aVal.localeCompare(bVal);
+  const aNum = parseFloat(aVal.replace(/[^0-9.-]/g, ''));
+  const bNum = parseFloat(bVal.replace(/[^0-9.-]/g, ''));
+  const isNum = !isNaN(aNum) && !isNaN(bNum);
+  return isNum ? aNum - bNum : aVal.localeCompare(bVal);
+}
 function sortTable(tableId, col, direction) {
   const table = document.getElementById(tableId);
   const tbody = table.querySelector('tbody');
-  let isAsc = table.dataset.sortCol == col && table.dataset.sortAsc === 'true';
+  const isFirstClickOnCol = table.dataset.sortCol != col;
+  let isAsc;
 
-  // If direction is specified, use it; otherwise toggle
+  // If direction is specified, use it; otherwise toggle. A never-before-
+  // sorted date column (e.g. "Last Used") starts most-recent-first instead
+  // of oldest-first — that's the useful default for a date, unlike text or
+  // numeric columns which start ascending.
   if (direction) {
     isAsc = direction === 'desc';
+  } else if (isFirstClickOnCol) {
+    const isListsTable = tableId === 'listsTable' || tableId === 'clickerListsTable';
+    const sampleRow = isListsTable ? tbody.querySelector('tr.list-summary-row') : tbody.querySelector('tr');
+    const sampleVal = sampleRow ? (isListsTable ? cellText(sampleRow, col) : (sampleRow.cells[col]?.innerText || '')) : '';
+    isAsc = looksLikeIsoDate(sampleVal);
   } else {
     isAsc = table.dataset.sortCol == col && table.dataset.sortAsc === 'true';
   }
@@ -5163,12 +5187,7 @@ function sortTable(tableId, col, direction) {
     // Sort only summary rows, re-append each with its paired detail row
     const summaryRows = Array.from(tbody.querySelectorAll('tr.list-summary-row'));
     summaryRows.sort((a, b) => {
-      const aVal = cellText(a, col);
-      const bVal = cellText(b, col);
-      const aNum = parseFloat(aVal.replace(/[^0-9.-]/g, ''));
-      const bNum = parseFloat(bVal.replace(/[^0-9.-]/g, ''));
-      const isNum = !isNaN(aNum) && !isNaN(bNum);
-      const cmp = isNum ? aNum - bNum : aVal.localeCompare(bVal);
+      const cmp = compareCellValues(cellText(a, col), cellText(b, col));
       return isAsc ? -cmp : cmp;
     });
     summaryRows.forEach(summaryRow => {
@@ -5180,12 +5199,7 @@ function sortTable(tableId, col, direction) {
   } else {
     const rows = Array.from(tbody.querySelectorAll('tr')).filter(r => !r.closest('.list-detail-row'));
     rows.sort((a, b) => {
-      const aVal = a.cells[col]?.innerText || '';
-      const bVal = b.cells[col]?.innerText || '';
-      const aNum = parseFloat(aVal.replace(/[^0-9.-]/g, ''));
-      const bNum = parseFloat(bVal.replace(/[^0-9.-]/g, ''));
-      const isNum = !isNaN(aNum) && !isNaN(bNum);
-      const cmp = isNum ? aNum - bNum : aVal.localeCompare(bVal);
+      const cmp = compareCellValues(a.cells[col]?.innerText || '', b.cells[col]?.innerText || '');
       return isAsc ? -cmp : cmp;
     });
     rows.forEach(r => tbody.appendChild(r));
