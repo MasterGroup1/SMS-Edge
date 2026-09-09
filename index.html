@@ -851,10 +851,22 @@ tbody tr:hover{background:#F8FAFC}
             </select>
           </div>
           <div>
-            <label style="font-size:11px;font-weight:600;color:#64748B;margin-right:6px">Brand</label>
-            <select id="plannerBrandFilter" onchange="onPlannerFilterChange()" style="border:1px solid #E2E8F0;border-radius:6px;padding:5px 8px;font-size:12px;font-family:inherit">
-              <option value="">All Brands</option>
+            <label style="font-size:11px;font-weight:600;color:#64748B;margin-right:6px">Country</label>
+            <select id="plannerCountryFilter" onchange="onPlannerFilterChange()" style="border:1px solid #E2E8F0;border-radius:6px;padding:5px 8px;font-size:12px;font-family:inherit">
+              <option value="">All Countries</option>
             </select>
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:600;color:#64748B;margin-right:6px">Type</label>
+            <select id="plannerTypeFilter" onchange="onPlannerFilterChange()" style="border:1px solid #E2E8F0;border-radius:6px;padding:5px 8px;font-size:12px;font-family:inherit">
+              <option value="">Main + Clickers</option>
+              <option value="Main">Main only</option>
+              <option value="Clickers">Clickers only</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:600;color:#64748B;margin-right:6px">Date</label>
+            <input type="date" id="plannerDateFilter" onchange="onPlannerFilterChange()" style="border:1px solid #E2E8F0;border-radius:6px;padding:4px 8px;font-size:12px;font-family:inherit">
           </div>
           <input type="text" id="plannerSearch" class="search" placeholder="Search planner..." onkeyup="onPlannerFilterChange()" style="margin:0;max-width:220px">
         </div>
@@ -1923,17 +1935,17 @@ function renderPlannerTab() {
   if (countryDL) countryDL.innerHTML = plannerKnownCountries().map(c => `<option value="${escAttr(c)}">`).join('');
 
   const brandSelect = document.getElementById('plannerBrandInput');
-  const brandFilter = document.getElementById('plannerBrandFilter');
   const brands = plannerKnownBrands();
   if (brandSelect && brandSelect.options.length <= 1) {
     brandSelect.innerHTML = '<option value="">—</option>' + brands.map(b => `<option value="${escAttr(b)}">${b}</option>`).join('');
   }
-  if (brandFilter && brandFilter.options.length <= 1) {
-    brandFilter.innerHTML = '<option value="">All Brands</option>' + brands.map(b => `<option value="${escAttr(b)}">${b}</option>`).join('');
-  }
   const calBrandFilter = document.getElementById('calendarBrandFilter');
   if (calBrandFilter && calBrandFilter.options.length <= 1) {
     calBrandFilter.innerHTML = '<option value="">All Brands</option>' + brands.map(b => `<option value="${escAttr(b)}">${b}</option>`).join('');
+  }
+  const countryFilter = document.getElementById('plannerCountryFilter');
+  if (countryFilter && countryFilter.options.length <= 1) {
+    countryFilter.innerHTML = '<option value="">All Countries</option>' + plannerKnownCountries().map(c => `<option value="${escAttr(c)}">${c}</option>`).join('');
   }
 
   if (!document.getElementById('plannerDateInput').value) {
@@ -2588,9 +2600,15 @@ function renderPlannerTable() {
   const tbody = document.getElementById('plannerBody');
   if (!tbody) return;
   const statusFilter = document.getElementById('plannerStatusFilter')?.value || 'Upcoming';
-  const brandFilter = document.getElementById('plannerBrandFilter')?.value || '';
+  const countryFilter = document.getElementById('plannerCountryFilter')?.value || '';
+  const typeFilter = document.getElementById('plannerTypeFilter')?.value || '';
+  const dateFilter = document.getElementById('plannerDateFilter')?.value || '';
   const search = (document.getElementById('plannerSearch')?.value || '').toLowerCase();
   const today = todayLocalStr();
+  // Auto-scheduled rows are saved with a blank country, so filtering (and
+  // display) falls back to the list's real country whenever the stored
+  // field is empty — otherwise "Country" would just be missing for most rows.
+  const countryOf = (p) => p.country || listCountriesOf(p.list);
 
   let rows = plannedSends.slice();
   if (statusFilter === 'Upcoming') {
@@ -2598,7 +2616,10 @@ function renderPlannerTable() {
   } else if (statusFilter !== 'All') {
     rows = rows.filter(p => p.status === statusFilter);
   }
-  if (brandFilter) rows = rows.filter(p => p.brand === brandFilter);
+  if (countryFilter) rows = rows.filter(p => countryOf(p).toLowerCase().includes(countryFilter.toLowerCase()));
+  if (typeFilter === 'Clickers') rows = rows.filter(p => p.list.endsWith(' - Clickers'));
+  else if (typeFilter === 'Main') rows = rows.filter(p => !p.list.endsWith(' - Clickers'));
+  if (dateFilter) rows = rows.filter(p => p.planned_date === dateFilter);
   if (search) {
     rows = rows.filter(p => [p.list, p.brand, p.country, p.notes].join(' ').toLowerCase().includes(search));
   }
@@ -2610,7 +2631,7 @@ function renderPlannerTable() {
       <input type="text" value="${escAttr(p.list)}" onchange="updatePlannedSend('${p._id}', 'list', this.value)" style="border:1px solid transparent;background:transparent;width:100%;font-size:12px;font-family:inherit">
     </td>
     <td>${p.brand || '—'}</td>
-    <td>${p.country || '—'}</td>
+    <td>${countryOf(p) || '—'}</td>
     <td><select onchange="updatePlannedSend('${p._id}', 'status', this.value)" style="font-size:11px;font-weight:600;color:${p.status==='Sent'?'#16A34A':p.status==='Cancelled'?'#DC2626':'#2563EB'};border:1px solid #E2E8F0;border-radius:4px;padding:3px 4px">
       <option value="Planned" ${p.status==='Planned'?'selected':''}>Planned</option>
       <option value="Sent" ${p.status==='Sent'?'selected':''}>Sent</option>
