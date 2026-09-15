@@ -5713,7 +5713,7 @@ function parseCSVData(text) {
       const periodStart = period.split(' - ')[0].trim();
       if (periodStart) date = parseCSVDate(periodStart);
     }
-    if (!date) date = parseCSVDate(created);
+    if (!date) date = parseCSVDate(created, true);
 
     // Determine type (Fresh vs Clicked)
     const isClicked = (!listName && name.toLowerCase().includes('click')) ||
@@ -5785,7 +5785,7 @@ function parseCSVRow(line) {
   return result;
 }
 
-function parseCSVDate(v) {
+function parseCSVDate(v, assumeMDY) {
   if (!v) return '';
   v = v.trim();
   // Excel serial number (e.g., 46121.79036)
@@ -5798,10 +5798,13 @@ function parseCSVDate(v) {
       return d.toISOString().slice(0, 10);
     }
   }
-  // Try dd/mm/yyyy
-  const ddmmyyyy = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-  if (ddmmyyyy) {
-    const [, dd, mm, yyyy] = ddmmyyyy;
+  // Slash-separated date. "Sending Period"/"Send End Date" values are dd/mm/yyyy;
+  // the "Created" system timestamp is mm/d/yyyy (US format) — pass assumeMDY for that one.
+  const slash = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (slash) {
+    const [, a, b, yyyy] = slash;
+    const mm = assumeMDY ? a : b;
+    const dd = assumeMDY ? b : a;
     return `${yyyy}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`;
   }
   // Try yyyy-mm-dd (possibly with time)
