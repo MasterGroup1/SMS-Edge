@@ -1881,6 +1881,8 @@ async function initSupabase() {
       }));
       filteredCampaigns = [...campaigns];
     }
+    // After campaigns load, so lists that have already been sent aren't re-registered
+    if (!registryErr && dbRegistry && dbRegistry.length > 0) topUpRegisteredLists();
     if (!contErr && dbContent && dbContent.length > 0) {
       contentRows.length = 0;
       dbContent.forEach(r => contentRows.push({
@@ -3730,7 +3732,127 @@ let registeredLists = [
   {list:'Roy Boy_NO_19102026_batch9', country:'Norway', partner:'Roy Boy', type:'Fresh'},
   {list:'Roy Boy_NO_19102026_batch10', country:'Norway', partner:'Roy Boy', type:'Fresh'}
 ];
+// Top-up from the SMS List Inventory sent 2026-10-29 (Internal Main List +
+// Internal Clickers List) — lists on the platform that weren't in the
+// dashboard yet. Legacy "XX Clicked" buckets, "Copy"/"Roy Roy Boy" duplicates
+// and spacing variants of lists that already exist were left out. Appended to
+// the starter set for a first run, and merged into an already-populated
+// list_registry once on load by topUpRegisteredLists().
+const INVENTORY_TOPUP_2026_10_29 = [
+  {list:'NZ_Rolle22425_SMSEdge', country:'New Zealand', partner:'', type:'Fresh'},
+  {list:'PlayMojo_IT_25082025_Batch1_10K', country:'Italy', partner:'', type:'Fresh'},
+  {list:'LuckyVibe_IT_25082025_Batch1_10K', country:'Italy', partner:'', type:'Fresh'},
+  {list:'RolleIT_25082025_Batch1_10K', country:'Italy', partner:'', type:'Fresh'},
+  {list:'FortunePlay_IT_25082025_Batch1_10K', country:'Italy', partner:'', type:'Fresh'},
+  {list:'FortunePlay_AU_25082025_Batch1_10K', country:'Australia', partner:'', type:'Fresh'},
+  {list:'Lilly_DE_25082025_Batch1_10K', country:'Germany', partner:'Lilly', type:'Fresh'},
+  {list:'Lilly_DE_07112025_Batch1_10K', country:'Germany', partner:'Lilly', type:'Fresh'},
+  {list:'Roy Boy_AT_15082026_batch1', country:'Austria', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_DE_15082026_batch1', country:'Germany', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_DE_15082026_batch2', country:'Germany', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_DE_15082026_batch3', country:'Germany', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_IT_15082026_batch1', country:'Italy', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_IT_15082026_batch2', country:'Italy', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_IT_15082026_batch3', country:'Italy', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_DE_23082026_batch1', country:'Germany', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_DE_23082026_batch2', country:'Germany', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_DE_23082026_batch3', country:'Germany', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_IT_23082026_batch1', country:'Italy', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_IT_23082026_batch2', country:'Italy', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_IT_23082026_batch3', country:'Italy', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_FR_23082026_batch3', country:'France', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_FR_23082026_batch4', country:'France', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_FR_23082026_batch5', country:'France', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_FR_23082026_batch6', country:'France', partner:'Roy Boy', type:'Fresh'},
+  {list:'BD_AU_03092026_batch1', country:'Australia', partner:'Lilly', type:'Fresh'},
+  {list:'BD_AU_03092026_batch2', country:'Australia', partner:'Lilly', type:'Fresh'},
+  {list:'BD_AU_03092026_batch3', country:'Australia', partner:'Lilly', type:'Fresh'},
+  {list:'BD_AU_03092026_batch4', country:'Australia', partner:'Lilly', type:'Fresh'},
+  {list:'BD_NZ_03092026_batch1', country:'New Zealand', partner:'Lilly', type:'Fresh'},
+  {list:'Roy Boy_IT_14092026_batch1', country:'Italy', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_IT_14092026_batch2', country:'Italy', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_IT_14092026_batch3', country:'Italy', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_ES_14092026_batch1', country:'Spain', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_CA_14092026_batch1', country:'Canada', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_CA_14092026_batch2', country:'Canada', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_CA_14092026_batch3', country:'Canada', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_CA_14092026_batch4', country:'Canada', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_CA_14092026_batch5', country:'Canada', partner:'Roy Boy', type:'Fresh'},
+  {list:'Artium_AU_28102026_batch1', country:'Australia', partner:'Artium', type:'Fresh'},
+  {list:'Artium_CA_28102026_batch1', country:'Canada', partner:'Artium', type:'Fresh'},
+  {list:'Artium_IT_28102026_batch1', country:'Italy', partner:'Artium', type:'Fresh'},
+  {list:'Artium_NZ_28102026_batch1', country:'New Zealand', partner:'Artium', type:'Fresh'},
+  {list:'Roy Boy - IE_Consol_22012026 - Clickers', country:'Ireland', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_CA_14092026_batch1 - Clickers', country:'Canada', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_CA_14092026_batch2 - Clickers', country:'Canada', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_CA_14092026_batch3 - Clickers', country:'Canada', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_CA_14092026_batch4 - Clickers', country:'Canada', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_CA_14092026_batch5 - Clickers', country:'Canada', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_IT_13102026_batch1 - Clickers', country:'Italy', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_IT_13102026_batch2 - Clickers', country:'Italy', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_IT_13102026_batch3 - Clickers', country:'Italy', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_IT_13102026_batch4 - Clickers', country:'Italy', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_IT_13102026_batch5 - Clickers', country:'Italy', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_IT_13102026_batch6 - Clickers', country:'Italy', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_IT_13102026_batch7 - Clickers', country:'Italy', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_IT_13102026_batch8 - Clickers', country:'Italy', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_IT_13102026_batch9 - Clickers', country:'Italy', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_IT_13102026_batch10 - Clickers', country:'Italy', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_IT_13102026_batch11 - Clickers', country:'Italy', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_IT_13102026_batch12 - Clickers', country:'Italy', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_NZ_13102026_batch1 - Clickers', country:'New Zealand', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_NZ_13102026_batch2 - Clickers', country:'New Zealand', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_NZ_13102026_batch3 - Clickers', country:'New Zealand', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_NZ_13102026_batch4 - Clickers', country:'New Zealand', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_NZ_13102026_batch5 - Clickers', country:'New Zealand', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_NZ_13102026_batch6 - Clickers', country:'New Zealand', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_NZ_13102026_batch7 - Clickers', country:'New Zealand', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_NZ_13102026_batch8 - Clickers', country:'New Zealand', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_NZ_13102026_batch9 - Clickers', country:'New Zealand', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_NZ_13102026_batch10 - Clickers', country:'New Zealand', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_NZ_13102026_batch11 - Clickers', country:'New Zealand', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_NZ_13102026_batch12 - Clickers', country:'New Zealand', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_AU_13102026_batch1 - Clickers', country:'Australia', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_AU_13102026_batch2 - Clickers', country:'Australia', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_NO_19102026_batch1 - Clickers', country:'Norway', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_NO_19102026_batch2 - Clickers', country:'Norway', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_NO_19102026_batch3 - Clickers', country:'Norway', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_NO_19102026_batch4 - Clickers', country:'Norway', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_NO_19102026_batch5 - Clickers', country:'Norway', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_NO_19102026_batch6 - Clickers', country:'Norway', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_NO_19102026_batch7 - Clickers', country:'Norway', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_NO_19102026_batch8 - Clickers', country:'Norway', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_NO_19102026_batch9 - Clickers', country:'Norway', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_NO_19102026_batch10 - Clickers', country:'Norway', partner:'Roy Boy', type:'Clicked'},
+  {list:'Artium_AU_28102026_batch1 - Clickers', country:'Australia', partner:'Artium', type:'Clicked'},
+  {list:'Artium_CA_28102026_batch1 - Clickers', country:'Canada', partner:'Artium', type:'Clicked'},
+  {list:'Artium_IT_28102026_batch1 - Clickers', country:'Italy', partner:'Artium', type:'Clicked'},
+  {list:'Artium_NZ_28102026_batch1 - Clickers', country:'New Zealand', partner:'Artium', type:'Clicked'}
+];
+registeredLists.push(...INVENTORY_TOPUP_2026_10_29.map(r => ({...r})));
 registeredLists.forEach(r => { r._id = crypto.randomUUID(); });
+
+// Merges INVENTORY_TOPUP_2026_10_29 into an already-populated list_registry
+// (the baked-in starter set is only used when the table is empty). Skips any
+// list already registered or already sent — loose match, so "Roy Boy- X" and
+// "Roy Boy - X" count as the same list — and runs once per browser so a list
+// deleted afterwards isn't re-added on every load.
+function topUpRegisteredLists() {
+  const doneKey = 'registryTopUp_2026-10-29';
+  try { if (localStorage.getItem(doneKey)) return; } catch (e) {}
+  const looseKey = (type, name) => (type === 'Clicked' ? 'CLK:' : 'FRESH:') + normalizeListName(name).toLowerCase().replace(/\s*-\s*/g, '-');
+  const have = new Set([
+    ...registeredLists.map(r => looseKey(r.type, r.list)),
+    ...campaigns.map(c => looseKey(c.type, c.list))
+  ]);
+  const missing = INVENTORY_TOPUP_2026_10_29
+    .filter(r => !have.has(looseKey(r.type, r.list)))
+    .map(r => ({ ...r, _id: crypto.randomUUID() }));
+  registeredLists.push(...missing);
+  saveRegisteredListsBatch(missing).then(() => {
+    try { localStorage.setItem(doneKey, '1'); } catch (e) {}
+  });
+}
 
 // Questions state
 let questions = [
