@@ -3739,12 +3739,6 @@ let registeredLists = [
 // the starter set for a first run, and merged into an already-populated
 // list_registry once on load by topUpRegisteredLists().
 const INVENTORY_TOPUP_2026_10_29 = [
-  {list:'NZ_Rolle22425_SMSEdge', country:'New Zealand', partner:'', type:'Fresh'},
-  {list:'PlayMojo_IT_25082025_Batch1_10K', country:'Italy', partner:'', type:'Fresh'},
-  {list:'LuckyVibe_IT_25082025_Batch1_10K', country:'Italy', partner:'', type:'Fresh'},
-  {list:'RolleIT_25082025_Batch1_10K', country:'Italy', partner:'', type:'Fresh'},
-  {list:'FortunePlay_IT_25082025_Batch1_10K', country:'Italy', partner:'', type:'Fresh'},
-  {list:'FortunePlay_AU_25082025_Batch1_10K', country:'Australia', partner:'', type:'Fresh'},
   {list:'Lilly_DE_25082025_Batch1_10K', country:'Germany', partner:'Lilly', type:'Fresh'},
   {list:'Lilly_DE_07112025_Batch1_10K', country:'Germany', partner:'Lilly', type:'Fresh'},
   {list:'Roy Boy_AT_15082026_batch1', country:'Austria', partner:'Roy Boy', type:'Fresh'},
@@ -6082,7 +6076,12 @@ function isJunkList(name) {
   if (/^pasted$/i.test(n)) return true;
   if (/^seed\s?list$/i.test(n)) return true;
   if (/^clickers\s*-\s*all partners$/i.test(n)) return true;
-  if (/^[A-Za-z]{2}\s+clicked\s+/i.test(n)) return true; // e.g. "DE Clicked Roy Boy", "AU Clicked Roy Boy"
+  if (/^[A-Za-z]{2}\s+click(ed|s)\b/i.test(n)) return true; // e.g. "DE Clicked Roy Boy", "AT Clicked", "IT Clicks"
+  if (/^clicked$/i.test(n)) return true;
+  if (/^SpinsUp\w*\s+[A-Za-z]{2}\s+clicked\b/i.test(n)) return true; // e.g. "SpinsUpRoy AT Clicked"
+  if (/^unsent\b/i.test(n)) return true; // e.g. "Unsent - L7_BD_AU_03092026_batch5"
+  if (/^(SP|TC\d+)_/i.test(n)) return true; // campaign-prefixed names, e.g. "SP_Roy Boy_FR_...", "TC23_RB_..."
+  if (/^sweden user\b/i.test(n)) return true;
   return false;
 }
 
