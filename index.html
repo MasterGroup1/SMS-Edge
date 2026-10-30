@@ -1873,7 +1873,7 @@ async function initSupabase() {
         sales: n(r.sales), cost: n(r.cost), revenue: n(r.revenue),
         roi: n(r.roi), ctr: n(r.ctr), cpa: n(r.cpa), ecpa: n(r.ecpa),
         breakeven: n(r.breakeven), profitable: r.profitable || false,
-        created: r.created || '', date: r.date || '',
+        created: r.created || '', date: fixSwappedDate(r.date || '', r.created || ''),
         rawList: normalizeListName(r.raw_list || ''),
         // Re-derive partner from list name in case old DB rows have blank/wrong partner
         partner: r.partner || extractPartnerJS(r.raw_list || '') || '',
@@ -1881,8 +1881,6 @@ async function initSupabase() {
       }));
       filteredCampaigns = [...campaigns];
     }
-    // After campaigns load, so lists that have already been sent aren't re-registered
-    if (!registryErr && dbRegistry && dbRegistry.length > 0) topUpRegisteredLists();
     if (!contErr && dbContent && dbContent.length > 0) {
       contentRows.length = 0;
       dbContent.forEach(r => contentRows.push({
@@ -2870,6 +2868,10 @@ async function addRegisteredList() {
   if (!list || !country) { alert('List name and Country are required.'); return; }
 
   const nList = normalizeListName(list);
+  if (isJunkList(nList)) {
+    alert(`"${nList}" doesn't match the naming convention — it must start with the partner (Roy Boy, Artium, Lilly, Hanni, BD, Idi, Salvino) and can't be a test list.`);
+    return;
+  }
   if (campaigns.some(c => c.list === nList) || registeredLists.some(r => normalizeListName(r.list) === nList)) {
     alert(`"${nList}" already exists — nothing to add.`);
     return;
@@ -3736,8 +3738,7 @@ let registeredLists = [
 // Internal Clickers List) — lists on the platform that weren't in the
 // dashboard yet. Legacy "XX Clicked" buckets, "Copy"/"Roy Roy Boy" duplicates
 // and spacing variants of lists that already exist were left out. Appended to
-// the starter set for a first run, and merged into an already-populated
-// list_registry once on load by topUpRegisteredLists().
+// the starter set, which seeds list_registry the first time it's empty.
 const INVENTORY_TOPUP_2026_10_29 = [
   {list:'Lilly_DE_25082025_Batch1_10K', country:'Germany', partner:'Lilly', type:'Fresh'},
   {list:'Lilly_DE_07112025_Batch1_10K', country:'Germany', partner:'Lilly', type:'Fresh'},
@@ -3825,28 +3826,6 @@ const INVENTORY_TOPUP_2026_10_29 = [
 ];
 registeredLists.push(...INVENTORY_TOPUP_2026_10_29.map(r => ({...r})));
 registeredLists.forEach(r => { r._id = crypto.randomUUID(); });
-
-// Merges INVENTORY_TOPUP_2026_10_29 into an already-populated list_registry
-// (the baked-in starter set is only used when the table is empty). Skips any
-// list already registered or already sent — loose match, so "Roy Boy- X" and
-// "Roy Boy - X" count as the same list — and runs once per browser so a list
-// deleted afterwards isn't re-added on every load.
-function topUpRegisteredLists() {
-  const doneKey = 'registryTopUp_2026-10-29';
-  try { if (localStorage.getItem(doneKey)) return; } catch (e) {}
-  const looseKey = (type, name) => (type === 'Clicked' ? 'CLK:' : 'FRESH:') + normalizeListName(name).toLowerCase().replace(/\s*-\s*/g, '-');
-  const have = new Set([
-    ...registeredLists.map(r => looseKey(r.type, r.list)),
-    ...campaigns.map(c => looseKey(c.type, c.list))
-  ]);
-  const missing = INVENTORY_TOPUP_2026_10_29
-    .filter(r => !have.has(looseKey(r.type, r.list)))
-    .map(r => ({ ...r, _id: crypto.randomUUID() }));
-  registeredLists.push(...missing);
-  saveRegisteredListsBatch(missing).then(() => {
-    try { localStorage.setItem(doneKey, '1'); } catch (e) {}
-  });
-}
 
 // Questions state
 let questions = [
@@ -5901,7 +5880,7 @@ function parseCSVData(text) {
       cpa: Math.round(cpa * 100) / 100,
       ecpa: Math.round(ecpa * 100) / 100,
       breakeven: Math.round(breakeven * 10) / 10,
-      profitable, created, date: date || '',
+      profitable, created, date: fixSwappedDate(date || '', created),
       partner: partner || '',
       sendingPeriod: sendingPeriod || '', sendEndDate: sendEndDate || ''
     });
@@ -5935,6 +5914,20 @@ function parseCSVRow(line) {
   }
   result.push(current);
   return result;
+}
+
+// Some dates arrive with day and month reversed ("2026-30-08", or a valid-looking
+// "2026-10-08" that is really 10 Aug), which breaks Last Used sorting and date
+// filters. Sends happen within days of the "Created" timestamp, so whichever
+// reading sits closer to Created is the right one.
+function fixSwappedDate(date, created) {
+  const m = (date || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const createdDate = parseCSVDate(created, true);
+  if (!m || !createdDate || +m[3] > 12) return date;
+  const swapped = `${m[1]}-${m[3]}-${m[2]}`;
+  if (+m[2] > 12) return swapped;
+  const gap = d => Math.abs(new Date(d) - new Date(createdDate));
+  return gap(swapped) < gap(date) ? swapped : date;
 }
 
 function parseCSVDate(v, assumeMDY) {
@@ -6073,16 +6066,10 @@ function isJunkList(name) {
   if (!name) return false;
   const n = name.trim();
   if (/\btest\b/i.test(n)) return true;
-  if (/^pasted$/i.test(n)) return true;
-  if (/^seed\s?list$/i.test(n)) return true;
-  if (/^clickers\s*-\s*all partners$/i.test(n)) return true;
-  if (/^[A-Za-z]{2}\s+click(ed|s)\b/i.test(n)) return true; // e.g. "DE Clicked Roy Boy", "AT Clicked", "IT Clicks"
-  if (/^clicked$/i.test(n)) return true;
-  if (/^SpinsUp\w*\s+[A-Za-z]{2}\s+clicked\b/i.test(n)) return true; // e.g. "SpinsUpRoy AT Clicked"
-  if (/^unsent\b/i.test(n)) return true; // e.g. "Unsent - L7_BD_AU_03092026_batch5"
-  if (/^(SP|TC\d+)_/i.test(n)) return true; // campaign-prefixed names, e.g. "SP_Roy Boy_FR_...", "TC23_RB_..."
-  if (/^sweden user\b/i.test(n)) return true;
-  return false;
+  // Naming convention: every real list starts with its partner. Anything else
+  // ("Unsent - ...", "SP_...", "TC23_RB_...", "IT Clicked", FortunePlay_...) is
+  // junk. A new partner has to be added here or its lists will be hidden.
+  return !/^(roy ?boy|artium|lilly|hanni|bd|idi|salvino)(?![a-z0-9])/i.test(n);
 }
 
 function extractPartnerJS(listName) {
