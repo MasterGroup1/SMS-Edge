@@ -3321,6 +3321,22 @@ let filteredLists = [];
 let filteredListsMain = []; // per-list rows for real send lists (Master List Planner) — never mixed with Clicker rows
 let filteredListsClickers = []; // per-list rows for Clicker/retargeting segments only
 let listDecisions = {}; // manual Use Again overrides, keyed by normalized list name — see recomputeAggregates()
+
+// Built-in manual "No" decisions. The list_decisions table doesn't exist in
+// this project's database yet, so decisions set in the UI don't survive a
+// refresh; these do. A saved decision in list_decisions takes precedence.
+const BUILT_IN_NO_LISTS = [
+  'Lilly_NZ_SMSedge_Batch1_10K', 'Roy Boy_NZ_29062026_batch3', 'Artium_NZ_04062026',
+  'Roy Boy_NZ_14092026_batch8', 'Roy Boy_17032026_NZ_Batch 1_3K', 'Roy Boy_NZ_18052026_2K',
+  'Roy Boy_NZ_14092026_batch7', 'Roy Boy_NZ_14092026_batch2', 'Roy Boy_NZ_13102026_batch11',
+  'Roy Boy_NZ_14092026_batch6', 'Roy Boy_NZ_14092026_batch10', 'Roy Boy_NZ_13102026_batch2',
+  'Roy Boy_NZ_13102026_batch8', 'Roy Boy_NZ_13102026_batch7', 'Hanni_13052026_NO_Batch 2_3.5K',
+  'Roy Boy_NZ_13102026_batch1', 'Roy Boy_NZ_14092026_batch5', 'BD_NZ_03092026_batch3',
+  'Roy Boy_IT_04062026_5K_Batch 6', 'Roy Boy_IT_15082026_batch7', 'Roy Boy_AU_15072026_batch3'
+];
+const BUILT_IN_DECISIONS = Object.fromEntries(BUILT_IN_NO_LISTS.map(list => [list, {
+  list, use_again: 'No', reason: 'Underperforming — October spend review', decision_date: '2026-11-09'
+}]));
 let listSizes = {}; // manual full list size (contacts), keyed by normalized list name — sends are often partial, so this can't be derived from Sent
 let plannedSends = []; // Planner tab: scheduled + historical sends, backed by the planned_sends table
 // Lists that exist (created on the platform) but haven't been sent yet have
@@ -4397,7 +4413,7 @@ function recomputeAggregates() {
       // Manual override from list_decisions, if a team member has set one
       group.autoReuse = group.reuse;
       group.autoReason = group.reason;
-      const _manual = listDecisions[group.list];
+      const _manual = listDecisions[group.list] || BUILT_IN_DECISIONS[group.list];
       if (_manual && _manual.use_again) {
         group.reuse = _manual.use_again;
         group.reason = _manual.reason || group.reason;
