@@ -3973,6 +3973,31 @@ const INVENTORY_TOPUP_2026_11_10_CLICKERS = [
   {list:'BD_CA_10112026_batch5 - Clickers', country:'Canada', partner:'Lilly', type:'Clicked'}
 ];
 registeredLists.push(...INVENTORY_TOPUP_2026_11_10_CLICKERS.map(r => ({...r})));
+// Main lists for the CA_29102026 and BD_10112026 Clickers above (same
+// country/partner corrections).
+const INVENTORY_TOPUP_2026_11_10_MAIN2 = [
+  {list:'Roy Boy_CA_29102026_batch1', country:'Canada', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_CA_29102026_batch2', country:'Canada', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_CA_29102026_batch3', country:'Canada', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_CA_29102026_batch4', country:'Canada', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_CA_29102026_batch5', country:'Canada', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_CA_29102026_batch6', country:'Canada', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_CA_29102026_batch7', country:'Canada', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_CA_29102026_batch8', country:'Canada', partner:'Roy Boy', type:'Fresh'},
+  {list:'BD_IT_10112026_batch1', country:'Italy', partner:'Lilly', type:'Fresh'},
+  {list:'BD_IT_10112026_batch2', country:'Italy', partner:'Lilly', type:'Fresh'},
+  {list:'BD_AU_10112026_batch1', country:'Australia', partner:'Lilly', type:'Fresh'},
+  {list:'BD_AU_10112026_batch2', country:'Australia', partner:'Lilly', type:'Fresh'},
+  {list:'BD_AU_10112026_batch3', country:'Australia', partner:'Lilly', type:'Fresh'},
+  {list:'BD_AU_10112026_batch4', country:'Australia', partner:'Lilly', type:'Fresh'},
+  {list:'BD_AU_10112026_batch5', country:'Australia', partner:'Lilly', type:'Fresh'},
+  {list:'BD_CA_10112026_batch1', country:'Canada', partner:'Lilly', type:'Fresh'},
+  {list:'BD_CA_10112026_batch2', country:'Canada', partner:'Lilly', type:'Fresh'},
+  {list:'BD_CA_10112026_batch3', country:'Canada', partner:'Lilly', type:'Fresh'},
+  {list:'BD_CA_10112026_batch4', country:'Canada', partner:'Lilly', type:'Fresh'},
+  {list:'BD_CA_10112026_batch5', country:'Canada', partner:'Lilly', type:'Fresh'}
+];
+registeredLists.push(...INVENTORY_TOPUP_2026_11_10_MAIN2.map(r => ({...r})));
 registeredLists.forEach(r => { r._id = crypto.randomUUID(); });
 
 // Questions state
