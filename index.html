@@ -4030,6 +4030,8 @@ const INVENTORY_TOPUP_2026_11_17 = [
   {list:'Roy Boy_AU_29102026_batch40 - Clickers', country:'Australia', partner:'Roy Boy', type:'Clicked'}
 ];
 registeredLists.push(...INVENTORY_TOPUP_2026_11_17.map(r => ({...r})));
+// Created on the platform 2026-11-16, after the last inventory export.
+registeredLists.push({list:'Roy Boy_NZ_16112026', country:'New Zealand', partner:'Roy Boy', type:'Fresh'});
 registeredLists.forEach(r => { r._id = crypto.randomUUID(); });
 
 // Questions state
