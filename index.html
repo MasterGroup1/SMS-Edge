@@ -3998,6 +3998,38 @@ const INVENTORY_TOPUP_2026_11_10_MAIN2 = [
   {list:'BD_CA_10112026_batch5', country:'Canada', partner:'Lilly', type:'Fresh'}
 ];
 registeredLists.push(...INVENTORY_TOPUP_2026_11_10_MAIN2.map(r => ({...r})));
+// Top-up from the SMS Edge Internal inventory sent 2026-11-17: AU 29102026
+// batches 27-40. The Clickers sheet has no batch30, so only its Main is here.
+const INVENTORY_TOPUP_2026_11_17 = [
+  {list:'Roy Boy_AU_29102026_batch27', country:'Australia', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_AU_29102026_batch28', country:'Australia', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_AU_29102026_batch29', country:'Australia', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_AU_29102026_batch30', country:'Australia', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_AU_29102026_batch31', country:'Australia', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_AU_29102026_batch32', country:'Australia', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_AU_29102026_batch33', country:'Australia', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_AU_29102026_batch34', country:'Australia', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_AU_29102026_batch35', country:'Australia', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_AU_29102026_batch36', country:'Australia', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_AU_29102026_batch37', country:'Australia', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_AU_29102026_batch38', country:'Australia', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_AU_29102026_batch39', country:'Australia', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_AU_29102026_batch40', country:'Australia', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_AU_29102026_batch27 - Clickers', country:'Australia', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_AU_29102026_batch28 - Clickers', country:'Australia', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_AU_29102026_batch29 - Clickers', country:'Australia', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_AU_29102026_batch31 - Clickers', country:'Australia', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_AU_29102026_batch32 - Clickers', country:'Australia', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_AU_29102026_batch33 - Clickers', country:'Australia', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_AU_29102026_batch34 - Clickers', country:'Australia', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_AU_29102026_batch35 - Clickers', country:'Australia', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_AU_29102026_batch36 - Clickers', country:'Australia', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_AU_29102026_batch37 - Clickers', country:'Australia', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_AU_29102026_batch38 - Clickers', country:'Australia', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_AU_29102026_batch39 - Clickers', country:'Australia', partner:'Roy Boy', type:'Clicked'},
+  {list:'Roy Boy_AU_29102026_batch40 - Clickers', country:'Australia', partner:'Roy Boy', type:'Clicked'}
+];
+registeredLists.push(...INVENTORY_TOPUP_2026_11_17.map(r => ({...r})));
 registeredLists.forEach(r => { r._id = crypto.randomUUID(); });
 
 // Questions state
