@@ -632,6 +632,20 @@ tbody tr:hover{background:#F8FAFC}
       .dr-add select{border:1.5px solid #E2E8F0;border-radius:8px;padding:6px;font-size:12px;background:#fff}
       .dr-add button{border:none;background:#2563EB;color:#fff;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer}
       .dr-note-status{font-size:11px;color:#94A3B8;margin-top:6px}
+      .tg-head{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start;justify-content:space-between}
+      .tg-toggle{display:inline-flex;background:#F1F5F9;border-radius:999px;padding:3px}
+      .tg-toggle button{border:none;background:none;padding:6px 14px;border-radius:999px;font-size:12px;font-weight:600;color:#475569;cursor:pointer}
+      .tg-toggle button.on{background:#fff;color:#1D4ED8;box-shadow:0 0 0 1.5px #93C5FD}
+      .tg-btn{border:1.5px solid #E2E8F0;background:#fff;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;color:#334155}
+      .tg-btn.primary{background:#2563EB;border-color:#2563EB;color:#fff}
+      .tg-edit-foot{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;font-size:12px;color:#64748B}
+      .tg-edit-foot input{border:1.5px solid #E2E8F0;border-radius:8px;padding:5px 8px;font-size:12px}
+      .tg-in{width:80px;border:1.5px solid #93C5FD;border-radius:6px;padding:3px 6px;font-size:12px;text-align:right}
+      .tg-table th.tg-sep,.tg-table td.tg-sep{border-left:1px solid #E2E8F0}
+      .tg-pct{display:inline-block;min-width:42px;text-align:center;font-weight:700;font-size:11px;padding:1px 6px;border-radius:999px;background:#F1F5F9;color:#475569}
+      .tg-pct.good{background:#DCFCE7;color:#16A34A}.tg-pct.warn{background:#FEF3C7;color:#B45309}.tg-pct.bad{background:#FEE2E2;color:#DC2626}
+      .tg-bar{height:6px;background:#F1F5F9;border-radius:999px;margin-top:6px;overflow:hidden}
+      .tg-bar span{display:block;height:100%;background:#94A3B8}.tg-bar span.good{background:#16A34A}.tg-bar span.warn{background:#F59E0B}.tg-bar span.bad{background:#DC2626}
     </style>
     <div class="tabs"><div class="tab active" data-tab="dailyreport">Daily Report</div></div>
 
@@ -661,6 +675,39 @@ tbody tr:hover{background:#F8FAFC}
     <div id="dr-wh-mtd-wrap" style="display:none">
       <div class="dr-sec">Month to date (<span class="dr-month-name"></span>) · Tableau</div>
       <div class="dr-tiles" id="dr-wh-mtd-tiles"></div>
+    </div>
+
+    <div class="dr-sec">Targets &amp; run rate · <span class="dr-month-name"></span></div>
+    <div class="dr-tiles" id="tg-tiles"></div>
+    <div class="card" style="margin-top:12px">
+      <div class="tg-head">
+        <div>
+          <div class="card-title dr-ct" style="margin-bottom:2px">Actuals vs targets, month by month</div>
+          <div class="dr-sub" style="margin:0">Previous months plus this month's checkpoints. FTDs from Tableau (incl. late conversions) where uploaded, otherwise SMS Edge sales.</div>
+        </div>
+        <div class="tg-toggle" id="tg-metric">
+          <button type="button" data-m="ftds" class="on">FTDs</button><button type="button" data-m="spend">Spend (€)</button><button type="button" data-m="ecpa">eCPA (€)</button>
+        </div>
+      </div>
+      <div style="position:relative;height:300px;margin-top:10px"><canvas id="tg-chart"></canvas></div>
+    </div>
+    <div class="card" style="margin-top:12px">
+      <div class="tg-head">
+        <div class="card-title dr-ct" style="margin:0">Targets table</div>
+        <div><button type="button" class="tg-btn" id="tg-edit-btn" onclick="toggleTargetEdit()">✎ Edit targets</button></div>
+      </div>
+      <div class="dr-wrap"><table class="dr-table tg-table">
+        <thead><tr><th>Month</th><th>Target FTDs</th><th>Target budget</th><th>Target eCPA</th><th class="tg-sep">Act FTDs</th><th>Act spend</th><th>Act eCPA</th><th class="tg-sep">FTDs %</th><th>Budget %</th><th>eCPA %</th></tr></thead>
+        <tbody id="tg-rows"></tbody>
+      </table></div>
+      <div class="tg-edit-foot" id="tg-edit-foot" style="display:none">
+        <label>Add month <input type="month" id="tg-new-month"></label>
+        <button type="button" class="tg-btn" onclick="addTargetMonth()">+ Add</button>
+        <span style="flex:1"></span>
+        <button type="button" class="tg-btn" onclick="toggleTargetEdit(false)">Cancel</button>
+        <button type="button" class="tg-btn primary" onclick="saveTargets()">Save targets</button>
+      </div>
+      <div class="dr-note-status" id="tg-status"></div>
     </div>
 
     <div class="dr-sec">Last 7 days vs the 7 before</div>
@@ -4236,6 +4283,25 @@ const INVENTORY_TOPUP_2026_11_17 = [
 registeredLists.push(...INVENTORY_TOPUP_2026_11_17.map(r => ({...r})));
 // Created on the platform 2026-11-16, after the last inventory export.
 registeredLists.push({list:'Roy Boy_NZ_16112026', country:'New Zealand', partner:'Roy Boy', type:'Fresh'});
+// Inventory update 2026-11-20 (Main + Clickers List (3))
+const INVENTORY_TOPUP_2026_11_20 = [
+  {list:'Roy Boy_AU_20112026_batch1', country:'Australia', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_AU_20112026_batch2', country:'Australia', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_AU_20112026_batch3', country:'Australia', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_AU_20112026_batch4', country:'Australia', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_AU_20112026_batch5', country:'Australia', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_AU_20112026_batch6', country:'Australia', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_AU_20112026_batch7', country:'Australia', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_NZ_20112026_batch1', country:'New Zealand', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_NZ_20112026_batch2', country:'New Zealand', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_NZ_20112026_batch3', country:'New Zealand', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_NZ_20112026_batch4', country:'New Zealand', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_NZ_20112026_batch5', country:'New Zealand', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_NZ_20112026_batch6', country:'New Zealand', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_NZ_20112026_batch7', country:'New Zealand', partner:'Roy Boy', type:'Fresh'},
+  {list:'Roy Boy_NZ_16112026 - Clickers', country:'New Zealand', partner:'Roy Boy', type:'Clicked'},
+];
+registeredLists.push(...INVENTORY_TOPUP_2026_11_20.map(r => ({...r})));
 registeredLists.forEach(r => { r._id = crypto.randomUUID(); });
 
 // Questions state
@@ -5044,6 +5110,7 @@ function renderDailyReport() {
 
   DR.lastF = F; DR.lastA = A;
   paintFindingsActions();
+  renderTargets();
 }
 
 // ── MANUAL FINDINGS / ACTIONS ───────────────
@@ -5142,6 +5209,189 @@ function renderWarehouseStatus() {
     : 'No Tableau data yet — the report below uses SMS Edge same-day conversions only.';
   st.innerHTML = (WH.lastMsg ? WH.lastMsg + '<br>' : '') + summary;
 }
+
+// ── TARGETS & RUN RATE (Daily Report) ───────
+// Monthly targets (FTDs, budget, eCPA) vs actuals. Actual FTDs come from Tableau
+// (monthly file, else the sum of daily rows, else SMS Edge sales); spend from SMS Edge.
+// Targets are editable on the page; saved to `report_targets` when that table exists
+// (docs/tableau_data.sql) and always to this browser.
+const TG = {
+  LS: 'smsedge.reportTargets.v1', db: false, loaded: false, editing: false, metric: 'ftds',
+  // starting values from the targets sheet
+  items: {
+    '2026-05': { ftds: 100, budget: 20000, ecpa: 200 },
+    '2026-06': { ftds: 150, budget: 30000, ecpa: 200 },
+    '2026-07': { ftds: 190, budget: 38000, ecpa: 200 },
+    '2026-08': { ftds: 290, budget: 55100, ecpa: 190 },
+    '2026-09': { ftds: 350, budget: 66500, ecpa: 190 },
+    '2026-10': { ftds: 350, budget: 68250, ecpa: 195 },
+    '2026-11': { ftds: 300, budget: 60000, ecpa: 200 },
+  },
+};
+TG.load = async () => {
+  try { const j = JSON.parse(localStorage.getItem(TG.LS) || 'null'); if (j && typeof j === 'object') Object.assign(TG.items, j); } catch (e) {}
+  if (typeof sb !== 'undefined' && sb) {
+    try {
+      const { data, error } = await sb.from('report_targets').select('month,ftds,budget,ecpa');
+      if (!error && Array.isArray(data)) {
+        TG.db = true;
+        data.forEach(r => { TG.items[r.month] = { ftds: +r.ftds || 0, budget: +r.budget || 0, ecpa: +r.ecpa || 0 }; });
+      }
+    } catch (e) {}
+  }
+};
+TG.save = async () => {
+  try { localStorage.setItem(TG.LS, JSON.stringify(TG.items)); } catch (e) {}
+  if (typeof sb !== 'undefined' && sb) {
+    try {
+      const payload = Object.entries(TG.items).map(([month, t]) => ({ month, ftds: t.ftds, budget: t.budget, ecpa: t.ecpa }));
+      const { error } = await sb.from('report_targets').upsert(payload, { onConflict: 'month' });
+      TG.db = !error;
+    } catch (e) { TG.db = false; }
+  }
+};
+function toggleTargetEdit(on) {
+  TG.editing = on === undefined ? !TG.editing : on;
+  renderTargets();
+}
+function addTargetMonth() {
+  const m = (document.getElementById('tg-new-month').value || '').slice(0, 7);
+  if (!/^\d{4}-\d{2}$/.test(m)) return;
+  if (!TG.items[m]) TG.items[m] = { ftds: 0, budget: 0, ecpa: 0 };
+  renderTargets();
+}
+async function saveTargets() {
+  document.querySelectorAll('#tg-rows input[data-m]').forEach(inp => {
+    const t = TG.items[inp.dataset.m] = TG.items[inp.dataset.m] || { ftds: 0, budget: 0, ecpa: 0 };
+    t[inp.dataset.k] = Math.max(0, parseFloat(String(inp.value).replace(/[€,\s]/g, '')) || 0);
+  });
+  TG.editing = false;
+  renderTargets();
+  await TG.save();
+  renderTargets();
+}
+
+function renderTargets() {
+  if (!document.getElementById('tg-tiles') || !window.__liveDataLoaded) return;
+  if (!TG.loaded) { TG.loaded = true; TG.load().then(renderTargets); }
+  const now = new Date();
+  const cur = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const curM = cur.slice(0, 7), cd = +cur.slice(8, 10);
+  const dim = new Date(Date.UTC(+cur.slice(0, 4), +cur.slice(5, 7), 0)).getUTCDate();
+  const rows = DR.rows().filter(r => r.d <= cur);
+  const spendIn = (from, to) => rows.reduce((a, r) => a + (r.d >= from && r.d <= to ? (+r.cost || 0) : 0), 0);
+  const salesIn = (from, to) => rows.reduce((a, r) => a + (r.d >= from && r.d <= to ? (+r.sales || 0) : 0), 0);
+  const monthEnd = m => `${m}-${String(new Date(Date.UTC(+m.slice(0, 4), +m.slice(5, 7), 0)).getUTCDate()).padStart(2, '0')}`;
+  // Tableau FTDs for a date range: daily rows if any exist in that range, else the monthly file, else null
+  const tabFtds = (from, to, m) => {
+    const ds = Object.keys(WH.rows).filter(d => d >= from && d <= to);
+    if (ds.length) return { v: ds.reduce((a, d) => a + (+WH.rows[d].ftds || 0), 0), src: 'Tableau daily' };
+    if (m && WH.months[m] && to === (m === curM ? cur : monthEnd(m))) return { v: +WH.months[m].ftds || 0, src: 'Tableau monthly' };
+    return null;
+  };
+  const actual = (m, toDay) => {
+    const from = m + '-01', to = toDay || (m === curM ? cur : monthEnd(m));
+    const spend = spendIn(from, to), sms = salesIn(from, to);
+    const tab = m !== curM && WH.months[m] ? { v: +WH.months[m].ftds || 0, src: 'Tableau monthly' } : tabFtds(from, to, m);
+    const ftds = tab ? tab.v : sms;
+    return { spend, ftds, sms, src: tab ? tab.src : 'SMS Edge sales', ecpa: ftds ? spend / ftds : null };
+  };
+  const pct = (a, b) => (a != null && b ? a / b : null);
+  const pctTxt = v => v == null ? '—' : Math.round(v * 100) + '%';
+  const cls = (v, kind) => {
+    if (v == null) return '';
+    if (kind === 'ftds') return v >= 1 ? 'good' : v >= 0.9 ? 'warn' : 'bad';
+    if (kind === 'budget') return v > 1.05 ? 'bad' : v > 1 ? 'warn' : '';
+    return v <= 1 ? 'good' : v <= 1.1 ? 'warn' : 'bad'; // eCPA: lower is better
+  };
+  const pill = (v, kind) => `<span class="tg-pct ${cls(v, kind)}">${pctTxt(v)}</span>`;
+
+  // ── This month
+  const T = TG.items[curM] || null;
+  const A = actual(curM);
+  const ftdRR = A.ftds / cd * dim, smsRR = A.sms / cd * dim, spendRR = A.spend / cd * dim;
+  const daysLeft = dim - cd;
+  const need = T ? Math.max(0, T.ftds - A.ftds) : null;
+  const needPerDay = T && daysLeft > 0 ? need / daysLeft : null;
+  const remBudget = T ? T.budget - A.spend : null;
+  const maxEcpaLeft = T && need ? remBudget / need : null;
+  const bar = v => `<div class="tg-bar"><span style="width:${Math.min(100, Math.max(0, (v || 0) * 100))}%" class="${cls(v, 'ftds')}"></span></div>`;
+  document.getElementById('tg-tiles').innerHTML = !T
+    ? `<div class="dr-empty">No target for ${DR.monthLabel(curM)} yet. Click "Edit targets" below to add one.</div>`
+    : [
+      DR.tile(`Target FTDs`, DR.int(T.ftds), `Budget ${DR.eur(T.budget)} · eCPA ${DR.eur(T.ecpa)}`),
+      DR.tile(`MTD FTDs (day ${cd})`, DR.int(A.ftds), `${pill(pct(A.ftds, T.ftds), 'ftds')} of target · ${A.src}${bar(pct(A.ftds, T.ftds))}`),
+      DR.tile('Run rate FTDs', DR.int(ftdRR), `${pill(pct(ftdRR, T.ftds), 'ftds')} of target · SMS Edge RR ${DR.int(smsRR)}`),
+      DR.tile('Needed per day', needPerDay == null ? '—' : needPerDay.toFixed(1), `to hit ${DR.int(T.ftds)} · now ${(A.ftds / cd).toFixed(1)}/day · ${daysLeft} days left`),
+      DR.tile('MTD eCPA', DR.eur(A.ecpa), `${pill(pct(A.ecpa, T.ecpa), 'ecpa')} of target ${DR.eur(T.ecpa)} · SMS Edge ${DR.eur(A.sms ? A.spend / A.sms : null)}`),
+      DR.tile('Spend', DR.eur(A.spend), `Run rate ${DR.eur(spendRR)} = ${pill(pct(spendRR, T.budget), 'budget')} of budget`),
+      DR.tile('eCPA allowed for the rest', maxEcpaLeft == null ? '—' : DR.eur(maxEcpaLeft), need ? `${DR.eur(remBudget)} budget left for ${DR.int(need)} more FTDs` : 'FTD target reached'),
+    ].join('');
+
+  // ── Table
+  const months = [...new Set([...Object.keys(TG.items), curM])].filter(m => m <= curM).sort();
+  const cell = (m, k, v) => TG.editing
+    ? `<input class="tg-in" data-m="${m}" data-k="${k}" value="${v || 0}" inputmode="decimal">`
+    : (k === 'ftds' ? DR.int(v) : DR.eur(v));
+  document.getElementById('tg-rows').innerHTML = months.map(m => {
+    const t = TG.items[m] || {}, a = actual(m), isCur = m === curM;
+    const row = `<tr${isCur ? ' style="background:#EFF6FF"' : ''}><td><b>${DR.monthLabel(m)}</b>${isCur ? ` <span class="m">(MTD, day ${cd})</span>` : ''}</td>
+      <td>${cell(m, 'ftds', t.ftds)}</td><td>${cell(m, 'budget', t.budget)}</td><td>${cell(m, 'ecpa', t.ecpa)}</td>
+      <td class="tg-sep" title="${a.src}">${DR.int(a.ftds)}</td><td>${DR.eur(a.spend)}</td><td>${DR.eur(a.ecpa)}</td>
+      <td class="tg-sep">${pill(pct(a.ftds, t.ftds), 'ftds')}</td><td>${pill(pct(a.spend, t.budget), 'budget')}</td><td>${pill(pct(a.ecpa, t.ecpa), 'ecpa')}</td></tr>`;
+    if (!isCur) return row;
+    return row + `<tr style="background:#F0FDF4"><td><b>${DR.monthLabel(m)}</b> <span class="m">run rate</span></td><td colspan="3" class="m">projected month end</td>
+      <td class="tg-sep">${DR.int(ftdRR)}</td><td>${DR.eur(spendRR)}</td><td>${DR.eur(ftdRR ? spendRR / ftdRR : null)}</td>
+      <td class="tg-sep">${pill(pct(ftdRR, t.ftds), 'ftds')}</td><td>${pill(pct(spendRR, t.budget), 'budget')}</td><td>${pill(pct(ftdRR ? spendRR / ftdRR : null, t.ecpa), 'ecpa')}</td></tr>`;
+  }).join('');
+  document.getElementById('tg-edit-btn').textContent = TG.editing ? 'Editing…' : '✎ Edit targets';
+  document.getElementById('tg-edit-foot').style.display = TG.editing ? 'flex' : 'none';
+  document.getElementById('tg-status').innerHTML = TG.db ? 'Targets are saved for everyone.' : 'Target changes are saved in this browser only until the setup SQL (docs/tableau_data.sql) has been run.';
+
+  // ── Chart: previous months + this month's checkpoints
+  const past = months.filter(m => m < curM);
+  const checkDays = [...new Set([5, 10, 15, 20, 25].filter(d => d < cd).concat(cd))];
+  const labels = [...past.map(m => DR.monthLabel(m)), ...checkDays.map(d => `${DR.monthLabel(curM).split(' ')[0]} (day ${d})`)];
+  const pts = [
+    ...past.map(m => { const a = actual(m), t = TG.items[m] || {}; return { t, a, rr: a }; }),
+    ...checkDays.map(d => {
+      const to = `${curM}-${String(d).padStart(2, '0')}`, a = actual(curM, to), t = T || {};
+      return { t, a, rr: { ftds: a.ftds / d * dim, spend: a.spend / d * dim, ecpa: a.ecpa } };
+    })
+  ];
+  const M = TG.metric;
+  const val = (o, k) => o && o[k] != null && isFinite(o[k]) ? Math.round(o[k] * (k === 'ftds' ? 10 : 1)) / (k === 'ftds' ? 10 : 1) : null;
+  const tk = M === 'spend' ? 'budget' : M;
+  const ds = [
+    { label: M === 'spend' ? 'Target budget' : M === 'ecpa' ? 'Target eCPA' : 'Target FTDs', data: pts.map(p => val(p.t, tk)), backgroundColor: '#5B6AA8' },
+    { label: M === 'ftds' ? 'Actual / MTD FTDs' : M === 'spend' ? 'Actual / MTD spend' : 'Actual / MTD eCPA', data: pts.map(p => val(p.a, M)), backgroundColor: '#3B5BFD' },
+  ];
+  if (M !== 'ecpa') ds.push({ label: M === 'ftds' ? 'Run rate FTDs' : 'Run rate spend', data: pts.map(p => val(p.rr, M)), backgroundColor: '#2E8B47' });
+  if (chartInstances['tgChart']) chartInstances['tgChart'].destroy();
+  const ctx = document.getElementById('tg-chart');
+  if (ctx && typeof Chart !== 'undefined') {
+    const money = M !== 'ftds';
+    chartInstances['tgChart'] = new Chart(ctx, {
+      type: 'bar',
+      data: { labels, datasets: ds.map(d => ({ ...d, borderRadius: 4, maxBarThickness: 22 })) },
+      options: {
+        animation: false,
+        responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+        plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
+          tooltip: { callbacks: { label: c => ` ${c.dataset.label}: ${c.parsed.y == null ? '—' : money ? DR.eur(c.parsed.y) : DR.int(c.parsed.y)}` } } },
+        scales: { y: { beginAtZero: true, ticks: { font: { size: 10 }, callback: v => money ? '€' + Number(v).toLocaleString('en-US') : v }, grid: { color: '#F1F5F9' } },
+                  x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 30, autoSkip: false } } }
+      }
+    });
+  }
+}
+document.getElementById('tg-metric')?.addEventListener('click', e => {
+  const b = e.target.closest('button[data-m]');
+  if (!b) return;
+  TG.metric = b.dataset.m;
+  document.querySelectorAll('#tg-metric button').forEach(x => x.classList.toggle('on', x === b));
+  renderTargets();
+});
 
 // ── KPI UPDATES ────────────────────────────
 function updateKPIs() {

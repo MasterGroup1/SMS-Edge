@@ -38,3 +38,15 @@ create policy "report_notes read"   on public.report_notes for select using (tru
 create policy "report_notes insert" on public.report_notes for insert with check (true);
 create policy "report_notes update" on public.report_notes for update using (true) with check (true);
 create policy "report_notes delete" on public.report_notes for delete using (true);
+
+-- Monthly targets on the Daily Report (FTDs, budget, eCPA)
+create table if not exists public.report_targets (
+  month   text primary key,          -- e.g. '2026-11'
+  ftds    numeric not null default 0,
+  budget  numeric not null default 0,
+  ecpa    numeric not null default 0
+);
+alter table public.report_targets enable row level security;
+create policy "report_targets read"   on public.report_targets for select using (true);
+create policy "report_targets insert" on public.report_targets for insert with check (true);
+create policy "report_targets update" on public.report_targets for update using (true) with check (true);
