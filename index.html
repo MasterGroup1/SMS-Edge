@@ -621,6 +621,17 @@ tbody tr:hover{background:#F8FAFC}
       .dr-drop-status .ok{color:#16A34A;font-weight:600}.dr-drop-status .err{color:#DC2626;font-weight:600}
       .dr-table .m{color:#94A3B8}
       .dr-tile.wh{background:#FFFBEB;border-color:#FDE68A}
+      .dr-list li.dr-note{grid-template-columns:12px 1fr auto}
+      .dr-acts li.dr-note{grid-template-columns:18px 1fr auto}
+      .dr-note-tag{display:inline-block;font-size:10px;font-weight:600;color:#7C3AED;background:#F3E8FF;border-radius:999px;padding:1px 7px;margin-left:6px;vertical-align:1px}
+      .dr-note-del{border:none;background:none;color:#94A3B8;font-size:16px;line-height:1;cursor:pointer;padding:0 2px}
+      .dr-note-del:hover{color:#DC2626}
+      .dr-acts li.done span{color:#94A3B8;text-decoration:line-through}
+      .dr-add{display:flex;gap:6px;margin-top:12px;padding-top:12px;border-top:1px solid #F1F5F9}
+      .dr-add input[type=text]{flex:1;min-width:0;border:1.5px solid #E2E8F0;border-radius:8px;padding:7px 10px;font-size:13px}
+      .dr-add select{border:1.5px solid #E2E8F0;border-radius:8px;padding:6px;font-size:12px;background:#fff}
+      .dr-add button{border:none;background:#2563EB;color:#fff;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer}
+      .dr-note-status{font-size:11px;color:#94A3B8;margin-top:6px}
     </style>
     <div class="tabs"><div class="tab active" data-tab="dailyreport">Daily Report</div></div>
 
@@ -659,10 +670,20 @@ tbody tr:hover{background:#F8FAFC}
       <div class="card">
         <div class="card-title dr-ct">Key findings</div>
         <ul class="dr-list" id="dr-findings"></ul>
+        <form class="dr-add" onsubmit="addReportNote(event, 'finding')">
+          <select id="dr-add-finding-color" title="Colour"><option value="r">🔴 Problem</option><option value="y" selected>🟡 Watch</option><option value="g">🟢 Good</option></select>
+          <input type="text" id="dr-add-finding" maxlength="500" placeholder="Add your own finding…">
+          <button type="submit">Add</button>
+        </form>
       </div>
       <div class="card">
         <div class="card-title dr-ct">Suggested actions</div>
         <ol class="dr-list dr-acts" id="dr-actions"></ol>
+        <form class="dr-add" onsubmit="addReportNote(event, 'action')">
+          <input type="text" id="dr-add-action" maxlength="500" placeholder="Add your own action item…">
+          <button type="submit">Add</button>
+        </form>
+        <div class="dr-note-status" id="dr-note-status"></div>
       </div>
     </div>
 
@@ -4698,6 +4719,7 @@ const DR = {
 };
 
 function renderDailyReport() {
+  if (!NOTES.loaded) { NOTES.loaded = true; NOTES.load().then(() => { if (document.getElementById('dailyreport')?.classList.contains('active')) paintFindingsActions(); }); }
   if (!WH.loaded) { WH.loaded = true; WH.load().then(() => { if (document.getElementById('dailyreport')?.classList.contains('active')) renderDailyReport(); }); }
   renderWarehouseStatus();
   // Never draw the report from the built-in (old) data: wait for the live campaigns.
@@ -5020,8 +5042,89 @@ function renderDailyReport() {
     A.push(`Judge lists on Tableau FTDs, not same-day sales: ${Math.round((whM.ftds - MTD.sales) / whM.ftds * 100)}% of ${monthName}'s FTDs came in late, so wait 2–3 days before marking a list "No".`);
   if (!A.length) A.push('No changes needed. Keep the current allocation and check again tomorrow.');
 
-  document.getElementById('dr-findings').innerHTML = F.map(x => `<li class="${x.c}"><span>${x.t}</span></li>`).join('') || '<li><span>Nothing stands out.</span></li>';
-  document.getElementById('dr-actions').innerHTML = A.map(t => `<li><span>${t}</span></li>`).join('') || '<li><span>No actions suggested — keep current allocation.</span></li>';
+  DR.lastF = F; DR.lastA = A;
+  paintFindingsActions();
+}
+
+// ── MANUAL FINDINGS / ACTIONS ───────────────
+// Your own key findings and action items on the Daily Report. Saved to the
+// `report_notes` table when it exists (docs/tableau_data.sql), and always to
+// this browser as a fallback.
+const NOTES = { items: [], db: false, loaded: false, LS: 'smsedge.reportNotes.v1' };
+NOTES.saveLocal = () => { try { localStorage.setItem(NOTES.LS, JSON.stringify(NOTES.items)); } catch (e) {} };
+NOTES.load = async () => {
+  try { NOTES.items = JSON.parse(localStorage.getItem(NOTES.LS) || '[]') || []; } catch (e) { NOTES.items = []; }
+  if (typeof sb !== 'undefined' && sb) {
+    try {
+      const { data, error } = await sb.from('report_notes').select('*').order('created_at');
+      if (!error && Array.isArray(data)) {
+        NOTES.db = true;
+        // push up anything saved in this browser before the table existed
+        const ids = new Set(data.map(n => n.id));
+        const localOnly = NOTES.items.filter(n => !ids.has(n.id));
+        if (localOnly.length) { const { error: e2 } = await sb.from('report_notes').insert(localOnly); if (!e2) data.push(...localOnly); }
+        NOTES.items = data;
+        NOTES.saveLocal();
+      }
+    } catch (e) {}
+  }
+};
+NOTES.write = async (op, item) => {
+  NOTES.saveLocal();
+  if (typeof sb === 'undefined' || !sb) return;
+  try {
+    const q = op === 'insert' ? sb.from('report_notes').insert(item)
+      : op === 'delete' ? sb.from('report_notes').delete().eq('id', item.id)
+      : sb.from('report_notes').update({ done: item.done }).eq('id', item.id);
+    const { error } = await q;
+    NOTES.db = !error;
+  } catch (e) { NOTES.db = false; }
+  paintFindingsActions();
+};
+function addReportNote(e, kind) {
+  e.preventDefault();
+  const input = document.getElementById(kind === 'finding' ? 'dr-add-finding' : 'dr-add-action');
+  const text = (input.value || '').trim();
+  if (!text) return;
+  const item = {
+    id: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2)),
+    kind, text, done: false, created_at: new Date().toISOString(),
+    color: kind === 'finding' ? (document.getElementById('dr-add-finding-color').value || 'y') : null
+  };
+  NOTES.items.push(item);
+  input.value = '';
+  paintFindingsActions();
+  NOTES.write('insert', item);
+}
+function removeReportNote(id) {
+  const item = NOTES.items.find(n => n.id === id);
+  if (!item || !confirm('Remove this note?\n\n' + item.text)) return;
+  NOTES.items = NOTES.items.filter(n => n.id !== id);
+  paintFindingsActions();
+  NOTES.write('delete', item);
+}
+function toggleReportNote(id) {
+  const item = NOTES.items.find(n => n.id === id);
+  if (!item) return;
+  item.done = !item.done;
+  paintFindingsActions();
+  NOTES.write('update', item);
+}
+function paintFindingsActions() {
+  if (!window.__liveDataLoaded) return; // the report itself is still loading
+  const F = DR.lastF || [], A = DR.lastA || [];
+  const when = n => new Date(n.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  const tag = n => `<span class="dr-note-tag">Your note · ${when(n)}</span>`;
+  const del = n => `<button type="button" class="dr-note-del" title="Remove" onclick="removeReportNote('${DR.esc(n.id)}')">×</button>`;
+  const mine = k => NOTES.items.filter(n => n.kind === k);
+  const fMine = mine('finding').map(n => `<li class="${['r', 'y', 'g'].includes(n.color) ? n.color : 'y'} dr-note"><span>${DR.esc(n.text)} ${tag(n)}</span>${del(n)}</li>`);
+  const aMine = mine('action').map(n => `<li class="dr-note${n.done ? ' done' : ''}"><span><label style="cursor:pointer"><input type="checkbox" ${n.done ? 'checked' : ''} onchange="toggleReportNote('${DR.esc(n.id)}')" style="margin-right:6px">${DR.esc(n.text)}</label> ${tag(n)}</span>${del(n)}</li>`);
+  document.getElementById('dr-findings').innerHTML = [...fMine, ...F.map(x => `<li class="${x.c}"><span>${x.t}</span></li>`)].join('') || '<li><span>Nothing stands out.</span></li>';
+  document.getElementById('dr-actions').innerHTML = [...aMine, ...A.map(t => `<li><span>${t}</span></li>`)].join('') || '<li><span>No actions suggested — keep current allocation.</span></li>';
+  const st = document.getElementById('dr-note-status');
+  if (st) st.innerHTML = NOTES.items.length
+    ? (NOTES.db ? 'Your notes are saved for everyone.' : 'Your notes are saved in this browser only. <span title="Run docs/tableau_data.sql in Supabase to share them">Run the setup SQL to share them.</span>')
+    : '';
 }
 
 function renderWarehouseStatus() {
