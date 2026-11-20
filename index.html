@@ -634,7 +634,7 @@ tbody tr:hover{background:#F8FAFC}
 
     <div class="dr-drop" id="dr-drop" onclick="document.getElementById('dr-file').click()">
       <input type="file" id="dr-file" accept=".csv,.tsv,.txt,.xlsx,.xls,.xlsm" multiple style="display:none" onchange="handleReportFiles(this.files); this.value=''">
-      <div class="dr-drop-main">📥 <b>Drop files here</b> or click to choose: the <b>Tableau</b> export (daily warehouse data) and/or the <b>SMS Edge</b> campaigns export. CSV or Excel, one or both at once.</div>
+      <div class="dr-drop-main">📥 <b>Drop files here</b> or click to choose: <b>Tableau</b> Daily Summary and/or Monthly Summary, and/or the <b>SMS Edge</b> campaigns export. CSV or Excel, several at once.</div>
       <div class="dr-drop-status" id="dr-wh-status"></div>
     </div>
 
@@ -657,6 +657,15 @@ tbody tr:hover{background:#F8FAFC}
 
     <div class="dr-sec">Last 30 send days</div>
     <div class="card"><div style="position:relative;height:260px"><canvas id="dr-trend"></canvas></div></div>
+
+    <div class="card" id="dr-mon-card" style="margin-top:16px;display:none">
+      <div class="card-title dr-ct">SMS Edge vs Tableau by month</div>
+      <div class="dr-sub">Total FTDs per month including late conversions. Uses the Tableau monthly file where uploaded, otherwise adds up the daily rows. Cost per FTD and NGR ÷ spend use SMS Edge spend for that month.</div>
+      <div class="dr-wrap"><table class="dr-table">
+        <thead><tr><th>Month</th><th>Spend</th><th>SMS leads</th><th>Tableau regs</th><th>SMS sales</th><th>Tableau FTDs</th><th>Late FTDs</th><th>Cost per FTD</th><th>First deposits</th><th>All deposits</th><th>NGR</th><th>NGR ÷ spend</th><th>Tableau source</th></tr></thead>
+        <tbody id="dr-mon"></tbody>
+      </table></div>
+    </div>
 
     <div class="card" id="dr-cmp-card" style="margin-top:16px;display:none">
       <div class="card-title dr-ct">SMS Edge vs Tableau by day</div>
@@ -4393,7 +4402,7 @@ function switchTab(tabName) {
 //  • SMS Edge campaigns export → the normal campaign import (parseCSVData)
 // Warehouse rows are saved to the `warehouse_daily` table when it exists
 // (see docs/warehouse_daily.sql), and always to this browser as a fallback.
-const WH = { rows: {}, meta: null, db: false, loaded: false, LS: 'smsedge.warehouseDaily.v1' };
+const WH = { rows: {}, months: {}, meta: null, db: false, loaded: false, LS: 'smsedge.warehouseDaily.v1' };
 WH.FIELDS = {
   'date': 'date', 'day': 'date', 'registrations': 'regs', 'regs': 'regs', 'ftds': 'ftds', 'ftd': 'ftds',
   'first deposit amount': 'firstDep', 'total deposit amount': 'deposits', 'total deposit count': 'depositCount',
@@ -4401,10 +4410,13 @@ WH.FIELDS = {
   'cashout amount': 'cashout', 'bonus cost': 'bonusCost', 'logins': 'logins'
 };
 WH.norm = h => String(h == null ? '' : h).toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
-WH.isHeader = row => { const n = (row || []).map(WH.norm); return n.includes('date') && (n.includes('ftds') || n.includes('registrations')); };
+// The period column: "Date"/"Day" (daily export) or anything with "month" in it ("Month of Month", "Month")
+WH.periodCol = n => { const d = n.findIndex(h => h === 'date' || h === 'day'); return d >= 0 ? { i: d, kind: 'day' } : (n.findIndex(h => /\bmonth\b/.test(h)) >= 0 ? { i: n.findIndex(h => /\bmonth\b/.test(h)), kind: 'month' } : null); };
+WH.isHeader = row => { const n = (row || []).map(WH.norm); return !!WH.periodCol(n) && (n.includes('ftds') || n.includes('registrations')); };
 WH.num = v => typeof v === 'number' ? v : (parseFloat(String(v == null ? '' : v).replace(/[€$£\s,%]/g, '')) || 0);
+WH.pad = n => String(n).padStart(2, '0');
 WH.toISO = (v, dmy) => {
-  const pad = n => String(n).padStart(2, '0');
+  const pad = WH.pad;
   if (typeof v === 'number' && v > 20000 && v < 80000) return new Date(Date.UTC(1899, 11, 30) + Math.floor(v) * 86400000).toISOString().slice(0, 10);
   const s = String(v == null ? '' : v).trim();
   let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
@@ -4419,48 +4431,64 @@ WH.toISO = (v, dmy) => {
   if (!isNaN(t) && /[a-z]/i.test(s) && /\d{4}/.test(s)) { const d = new Date(t); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
   return null;
 };
+// "11/2025", "2025-11", "November 2025", "Nov 2025", Excel date, "11/1/2025" → "2025-11"
+WH.toMonth = (v, dmy) => {
+  const pad = WH.pad;
+  if (typeof v === 'number' && v > 20000 && v < 80000) return WH.toISO(v).slice(0, 7);
+  const s = String(v == null ? '' : v).trim();
+  let m = s.match(/^(\d{1,2})[\/.\-](\d{4})$/); if (m && +m[1] >= 1 && +m[1] <= 12) return `${m[2]}-${pad(m[1])}`;
+  m = s.match(/^(\d{4})[\/.\-](\d{1,2})$/); if (m && +m[2] >= 1 && +m[2] <= 12) return `${m[1]}-${pad(m[2])}`;
+  m = s.match(/^([A-Za-z]{3,9})\.?,?\s+(\d{4})$/);
+  if (m) { const i = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'].indexOf(m[1].slice(0, 3).toLowerCase()); if (i >= 0) return `${m[2]}-${pad(i + 1)}`; }
+  const d = WH.toISO(s, dmy); return d ? d.slice(0, 7) : null;
+};
+// → { kind: 'day'|'month', rows: { '2026-11-20' | '2026-11': {...} } } or null if not a Tableau export
 WH.parse = (aoa) => {
   const hi = aoa.findIndex(r => WH.isHeader(r));
   if (hi < 0) return null;
-  const hdr = aoa[hi], idx = {};
-  hdr.forEach((h, i) => { const k = WH.FIELDS[WH.norm(h)]; if (k && idx[k] == null) idx[k] = i; });
-  const body = aoa.slice(hi + 1).filter(r => r && r[idx.date] !== '' && r[idx.date] != null);
+  const hdr = aoa[hi], n = hdr.map(WH.norm), pc = WH.periodCol(n), idx = {};
+  hdr.forEach((h, i) => { const k = WH.FIELDS[WH.norm(h)]; if (k && k !== 'date' && idx[k] == null) idx[k] = i; });
+  const body = aoa.slice(hi + 1).filter(r => r && r[pc.i] !== '' && r[pc.i] != null);
   // US (M/D) unless any day-first value (first part > 12) shows the file is D/M
-  const dmy = body.some(r => { const m = String(r[idx.date]).match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-]/); return m && +m[1] > 12; });
-  const out = {};
+  const dmy = body.some(r => { const m = String(r[pc.i]).match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-]\d/); return m && +m[1] > 12; });
+  const rows = {};
   body.forEach(r => {
-    const d = WH.toISO(r[idx.date], dmy);
-    if (!d) return; // skips "Grand Total" and blank rows
+    const key = pc.kind === 'month' ? WH.toMonth(r[pc.i], dmy) : WH.toISO(r[pc.i], dmy);
+    if (!key) return; // skips "Grand Total" and blank rows
     const o = {};
-    for (const [k, i] of Object.entries(idx)) if (k !== 'date') o[k] = WH.num(r[i]);
+    for (const [k, i] of Object.entries(idx)) o[k] = WH.num(r[i]);
     o.raw = {};
-    hdr.forEach((h, i) => { const key = String(h == null ? '' : h).trim(); if (key && i !== idx.date) o.raw[key] = r[i]; });
-    out[d] = o;
+    hdr.forEach((h, i) => { const k = String(h == null ? '' : h).trim(); if (k && i !== pc.i) o.raw[k] = r[i]; });
+    rows[key] = o;
   });
-  return out;
+  return { kind: pc.kind, rows };
 };
 WH.load = async () => {
-  try { const j = JSON.parse(localStorage.getItem(WH.LS) || 'null'); if (j) { WH.rows = j.rows || {}; WH.meta = j.meta || null; } } catch (e) {}
+  try { const j = JSON.parse(localStorage.getItem(WH.LS) || 'null'); if (j) { WH.rows = j.rows || {}; WH.months = j.months || {}; WH.meta = j.meta || null; } } catch (e) {}
   if (typeof sb !== 'undefined' && sb) {
-    try {
-      const { data, error } = await sb.from('warehouse_daily').select('day,data,source,uploaded_at').limit(5000);
-      if (!error && Array.isArray(data)) {
-        WH.db = true;
-        data.forEach(r => { WH.rows[r.day] = r.data; });
-        const latest = data.reduce((m, r) => (!m || r.uploaded_at > m.uploaded_at ? r : m), null);
-        if (latest) WH.meta = { file: latest.source, at: latest.uploaded_at };
-      }
-    } catch (e) {}
+    for (const [table, key, target] of [['warehouse_daily', 'day', 'rows'], ['warehouse_monthly', 'month', 'months']]) {
+      try {
+        const { data, error } = await sb.from(table).select(`${key},data,source,uploaded_at`).limit(5000);
+        if (!error && Array.isArray(data)) {
+          WH.db = true;
+          data.forEach(r => { WH[target][r[key]] = r.data; });
+          const latest = data.reduce((m, r) => (!m || r.uploaded_at > m.uploaded_at ? r : m), null);
+          if (latest && (!WH.meta || latest.uploaded_at > WH.meta.at)) WH.meta = { file: latest.source, at: latest.uploaded_at };
+        }
+      } catch (e) {}
+    }
   }
 };
-WH.save = async (newRows, meta) => {
-  Object.assign(WH.rows, newRows);
+WH.save = async (parsed, meta) => {
+  const monthly = parsed.kind === 'month';
+  Object.assign(monthly ? WH.months : WH.rows, parsed.rows);
   WH.meta = meta;
-  try { localStorage.setItem(WH.LS, JSON.stringify({ rows: WH.rows, meta })); } catch (e) {}
+  try { localStorage.setItem(WH.LS, JSON.stringify({ rows: WH.rows, months: WH.months, meta })); } catch (e) {}
   if (typeof sb !== 'undefined' && sb) {
     try {
-      const payload = Object.entries(newRows).map(([day, data]) => ({ day, data, source: meta.file, uploaded_at: meta.at }));
-      const { error } = await sb.from('warehouse_daily').upsert(payload, { onConflict: 'day' });
+      const key = monthly ? 'month' : 'day';
+      const payload = Object.entries(parsed.rows).map(([k, data]) => ({ [key]: k, data, source: meta.file, uploaded_at: meta.at }));
+      const { error } = await sb.from(monthly ? 'warehouse_monthly' : 'warehouse_daily').upsert(payload, { onConflict: key });
       WH.db = !error;
     } catch (e) { WH.db = false; }
   }
@@ -4550,10 +4578,12 @@ async function handleReportFiles(fileList) {
       const { aoa, csvText } = await readTableFile(file);
       const wh = WH.parse(aoa);
       if (wh) {
-        const days = Object.keys(wh).sort();
-        if (!days.length) throw new Error('no dated rows found');
+        const keys = Object.keys(wh.rows).sort();
+        if (!keys.length) throw new Error('no dated rows found');
         await WH.save(wh, { file: file.name, at: new Date().toISOString() });
-        msgs.push(`<span class="ok">Tableau: ${days.length} days loaded</span> (${DR.dayLabel(days[0])} – ${DR.dayLabel(days[days.length - 1])}) from ${DR.esc(file.name)}`);
+        msgs.push(wh.kind === 'month'
+          ? `<span class="ok">Tableau monthly: ${keys.length} months loaded</span> (${DR.monthLabel(keys[0])} – ${DR.monthLabel(keys[keys.length - 1])}) from ${DR.esc(file.name)}`
+          : `<span class="ok">Tableau daily: ${keys.length} days loaded</span> (${DR.dayLabel(keys[0])} – ${DR.dayLabel(keys[keys.length - 1])}) from ${DR.esc(file.name)}`);
         continue;
       }
       const hdr = (aoa.find(r => r.some(c => String(c).trim())) || []).map(c => String(c).trim());
@@ -4590,6 +4620,7 @@ const DR = {
   eur2: v => v == null || !isFinite(v) ? '—' : (v < 0 ? '−€' : '€') + Math.abs(Number(v)).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}),
   int: v => v == null || !isFinite(v) ? '—' : Math.round(v).toLocaleString('en-US'),
   pct: v => v == null || !isFinite(v) ? '—' : (v * 100).toFixed(2) + '%',
+  monthLabel: m => m ? new Date(m + '-01T00:00:00Z').toLocaleDateString('en-GB', {month: 'short', year: 'numeric', timeZone: 'UTC'}) : '—',
   dayLabel: d => d ? new Date(d + 'T00:00:00Z').toLocaleDateString('en-GB', {weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC'}) : '—',
   _bk: {},
   brandOf(c) {
@@ -4725,16 +4756,57 @@ function renderDailyReport() {
       whTile('NGR ÷ spend', x(D.spend ? whD.ngr / D.spend : null), `on ${DR.eur(D.spend)} SMS spend`),
     ].join('');
   const mDays = calDays(monthKey + '-01', day);
-  const whM = whSum(mDays);
-  document.getElementById('dr-wh-mtd-wrap').style.display = hasWH ? '' : 'none';
-  document.getElementById('dr-wh-mtd-tiles').innerHTML = !hasWH ? '' : [
+  let whM = whSum(mDays);
+  const hasMonths = Object.keys(WH.months).length > 0;
+  const mRow = WH.months[monthKey];
+  // No daily rows for this month → fall back to the monthly file's figure
+  const mtdFromMonthly = !whM.days && !!mRow;
+  if (mtdFromMonthly) { whM = { days: 0 }; whDayKeys.forEach(k => whM[k] = +mRow[k] || 0); }
+  const showMtd = hasWH || mtdFromMonthly;
+  const coverNote = mtdFromMonthly ? 'From the monthly file (whole month)'
+    : `Tableau covers ${whM.days} of ${mDays.length} days` + (mRow ? ` · monthly file: ${DR.int(mRow.ftds)} FTDs` : '');
+  document.getElementById('dr-wh-mtd-wrap').style.display = showMtd ? '' : 'none';
+  document.getElementById('dr-wh-mtd-tiles').innerHTML = !showMtd ? '' : [
     whTile('Registrations', DR.int(whM.regs), `SMS Edge leads ${DR.int(MTD.leads)} · ${late(whM.regs, MTD.leads)}`),
     whTile('FTDs', DR.int(whM.ftds), `SMS Edge sales ${DR.int(MTD.sales)} · ${late(whM.ftds, MTD.sales)}`),
     whTile('Cost per FTD', DR.eur(whM.ftds ? MTD.spend / whM.ftds : null), `SMS Edge per sale ${DR.eur(MTD.cpa)}`),
     whTile('Deposits', DR.eur(whM.deposits), `First deposits ${DR.eur(whM.firstDep)}`),
     whTile('NGR', DR.eur(whM.ngr), `GGR ${DR.eur(whM.ggr)}`),
-    whTile('NGR ÷ spend', x(MTD.spend ? whM.ngr / MTD.spend : null), `Tableau covers ${whM.days} of ${mDays.length} days`),
+    whTile('NGR ÷ spend', x(MTD.spend ? whM.ngr / MTD.spend : null), coverNote),
   ].join('');
+
+  // Month by month: SMS Edge vs Tableau (monthly file where uploaded, else the sum of daily rows)
+  const allMonths = [...new Set([
+    ...rows.map(r => r.d.slice(0, 7)), ...Object.keys(WH.months), ...Object.keys(WH.rows).map(d => d.slice(0, 7))
+  ])].filter(m => m <= monthKey).sort().reverse();
+  document.getElementById('dr-mon-card').style.display = (hasWH || hasMonths) ? '' : 'none';
+  const monStats = allMonths.map(m => {
+    const s = DR.sum(upTo.filter(r => r.d.startsWith(m)));
+    let w = null, src = '';
+    if (WH.months[m]) { w = WH.months[m]; src = 'Monthly file'; }
+    else {
+      const ds = Object.keys(WH.rows).filter(d => d.startsWith(m) && d <= day);
+      if (ds.length) { w = whSum(ds); src = `Daily file (${ds.length} days)`; }
+    }
+    return { m, s, w, src };
+  });
+  const monRow = (label, s, w, src, style) => {
+    const cell = v => w ? v : '<span class="m">—</span>';
+    const sp = s ? s.spend : 0;
+    return `<tr${style ? ` style="${style}"` : ''}><td>${label}</td><td>${s ? DR.eur(s.spend) : '<span class="m">—</span>'}</td><td>${s ? DR.int(s.leads) : '<span class="m">—</span>'}</td><td>${cell(DR.int(w && w.regs))}</td>
+      <td>${s ? DR.int(s.sales) : '<span class="m">—</span>'}</td><td>${cell('<b>' + DR.int(w && w.ftds) + '</b>')}</td><td>${cell(s ? DR.int(w && (w.ftds - s.sales)) : '—')}</td>
+      <td>${cell(DR.eur(w && w.ftds && sp ? sp / w.ftds : null))}</td><td>${cell(DR.eur(w && w.firstDep))}</td><td>${cell(DR.eur(w && w.deposits))}</td>
+      <td>${cell(DR.eur(w && w.ngr))}</td><td>${cell(x(w && sp ? w.ngr / sp : null))}</td><td class="m">${src}</td></tr>`;
+  };
+  const addUp = list => { const o = {}; whDayKeys.forEach(k => o[k] = list.reduce((a, r) => a + (+r[k] || 0), 0)); return o; };
+  const both = monStats.filter(r => r.w && r.s.campaigns);
+  const tS = both.length ? { spend: both.reduce((a, r) => a + r.s.spend, 0), leads: both.reduce((a, r) => a + r.s.leads, 0), sales: both.reduce((a, r) => a + r.s.sales, 0) } : null;
+  const tW = both.length ? addUp(both.map(r => r.w)) : null;
+  const allW = monStats.filter(r => r.w);
+  document.getElementById('dr-mon').innerHTML =
+    monStats.map(r => monRow(DR.monthLabel(r.m) + (r.m === monthKey ? ' (so far)' : ''), r.s.campaigns ? r.s : null, r.w, r.src, r.m === monthKey ? 'background:#EFF6FF' : '')).join('') +
+    (tS ? monRow(`<b>Total · months with SMS Edge sends (${both.length})</b>`, tS, tW, '', 'border-top:2px solid #CBD5E1;font-weight:600') : '') +
+    (allW.length > both.length ? monRow(`<b>Total · all Tableau months (${allW.length})</b>`, null, addUp(allW.map(r => r.w)), '', 'font-weight:600') : '');
 
   // Day-by-day comparison (last 30 calendar days to the report day)
   document.getElementById('dr-cmp-card').style.display = hasWH ? '' : 'none';
@@ -4810,12 +4882,17 @@ function renderDailyReport() {
     F.push({ c: 'r', t: `<b>Cost per sale is up:</b> ${DR.eur(MTD.cpa)} this month vs ${DR.eur(ALL.cpa)} all time.` });
   else if (MTD.cpa != null && ALL.cpa != null && MTD.cpa < ALL.cpa * 0.85)
     F.push({ c: 'g', t: `<b>Cost per sale is improving:</b> ${DR.eur(MTD.cpa)} this month vs ${DR.eur(ALL.cpa)} all time.` });
-  if (hasWH && whM.days) {
+  if (tS && tW) {
+    const lateT = tW.ftds - tS.sales;
+    const first = both[both.length - 1].m;
+    F.push({ c: 'g', t: `<b>All months since ${DR.monthLabel(first)}:</b> Tableau <b>${DR.int(tW.ftds)}</b> FTDs vs ${DR.int(tS.sales)} same-day sales in SMS Edge (${lateT >= 0 ? '+' : ''}${DR.int(lateT)} late, ${tW.ftds ? Math.round(lateT / tW.ftds * 100) : 0}% of FTDs). Real cost per FTD <b>${DR.eur(tW.ftds ? tS.spend / tW.ftds : null)}</b>; NGR ÷ spend <b>${x(tS.spend ? tW.ngr / tS.spend : null)}</b>.` });
+  }
+  if ((hasWH || mtdFromMonthly) && (whM.days || mtdFromMonthly)) {
     const lateN = whM.ftds - MTD.sales;
     F.push({ c: 'g', t: `<b>Late conversions:</b> Tableau shows <b>${DR.int(whM.ftds)}</b> FTDs this month vs ${DR.int(MTD.sales)} same-day sales in SMS Edge (${lateN >= 0 ? '+' : ''}${DR.int(lateN)}), so the real cost per FTD is <b>${DR.eur(whM.ftds ? MTD.spend / whM.ftds : null)}</b>, not ${DR.eur(MTD.cpa)}.` });
     if (MTD.spend) {
       const r = whM.ngr / MTD.spend;
-      F.push({ c: r >= 1 ? 'g' : 'r', t: `<b>NGR ÷ spend this month: ${x(r)}</b> (${DR.eur(whM.ngr)} NGR on ${DR.eur(MTD.spend)} spend)${whM.days < mDays.length ? ` — Tableau covers ${whM.days} of ${mDays.length} days` : ''}.` });
+      F.push({ c: r >= 1 ? 'g' : 'r', t: `<b>NGR ÷ spend this month: ${x(r)}</b> (${DR.eur(whM.ngr)} NGR on ${DR.eur(MTD.spend)} spend)${!mtdFromMonthly && whM.days < mDays.length ? ` — Tableau covers ${whM.days} of ${mDays.length} days` : ''}.` });
     }
   }
   if (MTD.spend > 0 && MTD.sales === 0)
@@ -4859,8 +4936,12 @@ function renderWarehouseStatus() {
   const st = document.getElementById('dr-wh-status');
   if (!st) return;
   const days = Object.keys(WH.rows).sort();
-  const summary = days.length
-    ? `Tableau data on file: <b>${days.length} days</b> (${DR.dayLabel(days[0])} – ${DR.dayLabel(days[days.length - 1])})` +
+  const months = Object.keys(WH.months).sort();
+  const parts = [];
+  if (days.length) parts.push(`<b>${days.length} days</b> (${DR.dayLabel(days[0])} – ${DR.dayLabel(days[days.length - 1])})`);
+  if (months.length) parts.push(`<b>${months.length} months</b> (${DR.monthLabel(months[0])} – ${DR.monthLabel(months[months.length - 1])})`);
+  const summary = parts.length
+    ? `Tableau data on file: ${parts.join(' and ')}` +
       (WH.meta ? ` · last upload ${DR.esc(WH.meta.file)} on ${new Date(WH.meta.at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}` : '') +
       (WH.db ? ' · saved for everyone' : ' · <span title="Run docs/warehouse_daily.sql in Supabase to share it with everyone">saved in this browser only</span>')
     : 'No Tableau data yet — the report below uses SMS Edge same-day conversions only.';
