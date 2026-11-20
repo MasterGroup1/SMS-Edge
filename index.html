@@ -629,7 +629,7 @@ tbody tr:hover{background:#F8FAFC}
         <h1 class="dr-title">Daily Report</h1>
         <p class="dr-lede" id="dr-lede">Loading…</p>
       </div>
-      <label class="dr-pick">Report day <select id="dr-day" onchange="renderDailyReport()"></select></label>
+      <label class="dr-pick">Report day <select id="dr-day" onchange="this.dataset.picked = '1'; renderDailyReport()"></select></label>
     </div>
 
     <div class="dr-drop" id="dr-drop" onclick="document.getElementById('dr-file').click()">
@@ -655,6 +655,17 @@ tbody tr:hover{background:#F8FAFC}
     <div class="dr-sec">Last 7 days vs the 7 before</div>
     <div class="dr-tiles" id="dr-l7-tiles"></div>
 
+    <div class="dr-two" style="margin-top:22px">
+      <div class="card">
+        <div class="card-title dr-ct">Key findings</div>
+        <ul class="dr-list" id="dr-findings"></ul>
+      </div>
+      <div class="card">
+        <div class="card-title dr-ct">Suggested actions</div>
+        <ol class="dr-list dr-acts" id="dr-actions"></ol>
+      </div>
+    </div>
+
     <div class="dr-sec">Last 30 send days</div>
     <div class="card"><div style="position:relative;height:260px"><canvas id="dr-trend"></canvas></div></div>
 
@@ -674,17 +685,6 @@ tbody tr:hover{background:#F8FAFC}
         <thead><tr><th>Day</th><th>Spend</th><th>SMS leads</th><th>Tableau regs</th><th>SMS sales</th><th>Tableau FTDs</th><th>Late FTDs</th><th>Cost per FTD</th><th>First deposits</th><th>All deposits</th><th>NGR</th><th>NGR ÷ spend</th></tr></thead>
         <tbody id="dr-cmp"></tbody>
       </table></div>
-    </div>
-
-    <div class="dr-two" style="margin-top:16px">
-      <div class="card">
-        <div class="card-title dr-ct">Key findings</div>
-        <ul class="dr-list" id="dr-findings"></ul>
-      </div>
-      <div class="card">
-        <div class="card-title dr-ct">Suggested actions</div>
-        <ol class="dr-list dr-acts" id="dr-actions"></ol>
-      </div>
     </div>
 
     <div class="card" style="margin-top:16px">
@@ -1928,7 +1928,7 @@ async function fetchAllCampaigns() {
   let all = [];
   let offset = 0;
   while (true) {
-    const { data, error } = await sb.from('campaigns').select('*').order('date', { ascending: false }).range(offset, offset + PAGE - 1);
+    const { data, error } = await sb.from('campaigns').select('*').order('date', { ascending: false }).order('id', { ascending: false }).range(offset, offset + PAGE - 1);
     if (error) return { data: all.length ? all : null, error };
     if (!data || data.length === 0) break;
     all = all.concat(data);
@@ -2013,6 +2013,7 @@ async function initSupabase() {
       }
     }
     if (!campErr && dbCamps && dbCamps.length > 0) {
+      window.__campsFromDb = true;
       campaigns.length = 0;
       const n = v => Number(v) || 0; // ensure numeric — Supabase may return strings
       dbCamps.forEach(r => campaigns.push({
@@ -2044,7 +2045,11 @@ async function initSupabase() {
     console.warn('Supabase failed, using local data:', e);
     setDbStatus('offline', 'Offline');
   }
+  window.__liveDataLoaded = true;
   initApp();
+  // The Daily Report may have been opened on the built-in (older) data while the
+  // live campaigns were still loading — redraw it with the live data.
+  if (document.getElementById('dailyreport')?.classList.contains('active')) renderDailyReport();
   seedNZAugustPlans();
 }
 
@@ -4676,7 +4681,8 @@ function renderDailyReport() {
   }
   const prevSel = sel.value;
   sel.innerHTML = days.map(d => `<option value="${d}">${DR.dayLabel(d)}</option>`).join('');
-  const day = days.includes(prevSel) ? prevSel : days[0];
+  // Default to the latest day with sends; keep an earlier day only if the user picked it
+  const day = sel.dataset.picked && days.includes(prevSel) ? prevSel : days[0];
   sel.value = day;
 
   const prevDay = days[days.indexOf(day) + 1] || null;
@@ -4708,7 +4714,7 @@ function renderDailyReport() {
   document.querySelectorAll('#dailyreport .dr-month-name').forEach(el => { el.textContent = monthName; });
 
   // Lede
-  document.getElementById('dr-lede').innerHTML =
+  document.getElementById('dr-lede').innerHTML = (!window.__liveDataLoaded ? '<span style="color:#D97706;font-weight:600">Loading the latest data…</span> ' : !window.__campsFromDb ? '<span style="color:#DC2626;font-weight:600">Couldn\x27t load the live data, so this shows older built-in data. Refresh the page to try again.</span><br>' : '') +
     `On <b>${DR.dayLabel(day)}</b> we sent <b>${DR.int(D.campaigns)}</b> campaigns (<b>${DR.int(D.sent)}</b> SMS) for <b>${DR.eur(D.spend)}</b>, ` +
     `bringing <b>${DR.int(D.leads)}</b> lead${D.leads === 1 ? "" : "s"} and <b>${DR.int(D.sales)}</b> sale${D.sales === 1 ? "" : "s"}. ` +
     `${monthName} to date: <b>${DR.eur(MTD.spend)}</b> spend, <b>${DR.int(MTD.sales)}</b> sales` +
