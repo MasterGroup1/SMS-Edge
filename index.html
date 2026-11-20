@@ -641,14 +641,14 @@ tbody tr:hover{background:#F8FAFC}
     <div class="dr-sec">The day · SMS Edge (same-day)</div>
     <div class="dr-tiles" id="dr-day-tiles"></div>
     <div id="dr-wh-day-wrap" style="display:none">
-      <div class="dr-sec">The day · Tableau warehouse (incl. late conversions)</div>
+      <div class="dr-sec">The day · Tableau (incl. late conversions)</div>
       <div class="dr-tiles" id="dr-wh-day-tiles"></div>
     </div>
 
     <div class="dr-sec">Month to date · SMS Edge</div>
     <div class="dr-tiles" id="dr-mtd-tiles"></div>
     <div id="dr-wh-mtd-wrap" style="display:none">
-      <div class="dr-sec">Month to date · Tableau warehouse</div>
+      <div class="dr-sec">Month to date · Tableau</div>
       <div class="dr-tiles" id="dr-wh-mtd-tiles"></div>
     </div>
 
@@ -4400,8 +4400,8 @@ function switchTab(tabName) {
 // One drop target for both exports, CSV or Excel:
 //  • Tableau "Daily Summary" (Date, Registrations, FTDs, deposits, NGR…) → warehouse rows by day
 //  • SMS Edge campaigns export → the normal campaign import (parseCSVData)
-// Warehouse rows are saved to the `warehouse_daily` table when it exists
-// (see docs/warehouse_daily.sql), and always to this browser as a fallback.
+// Warehouse rows are saved to the `tableau_daily` table when it exists
+// (see docs/tableau_data.sql), and always to this browser as a fallback.
 const WH = { rows: {}, months: {}, meta: null, db: false, loaded: false, LS: 'smsedge.warehouseDaily.v1' };
 WH.FIELDS = {
   'date': 'date', 'day': 'date', 'registrations': 'regs', 'regs': 'regs', 'ftds': 'ftds', 'ftd': 'ftds',
@@ -4466,7 +4466,7 @@ WH.parse = (aoa) => {
 WH.load = async () => {
   try { const j = JSON.parse(localStorage.getItem(WH.LS) || 'null'); if (j) { WH.rows = j.rows || {}; WH.months = j.months || {}; WH.meta = j.meta || null; } } catch (e) {}
   if (typeof sb !== 'undefined' && sb) {
-    for (const [table, key, target] of [['warehouse_daily', 'day', 'rows'], ['warehouse_monthly', 'month', 'months']]) {
+    for (const [table, key, target] of [['tableau_daily', 'day', 'rows'], ['tableau_monthly', 'month', 'months']]) {
       try {
         const { data, error } = await sb.from(table).select(`${key},data,source,uploaded_at`).limit(5000);
         if (!error && Array.isArray(data)) {
@@ -4488,7 +4488,7 @@ WH.save = async (parsed, meta) => {
     try {
       const key = monthly ? 'month' : 'day';
       const payload = Object.entries(parsed.rows).map(([k, data]) => ({ [key]: k, data, source: meta.file, uploaded_at: meta.at }));
-      const { error } = await sb.from(monthly ? 'warehouse_monthly' : 'warehouse_daily').upsert(payload, { onConflict: key });
+      const { error } = await sb.from(monthly ? 'tableau_monthly' : 'tableau_daily').upsert(payload, { onConflict: key });
       WH.db = !error;
     } catch (e) { WH.db = false; }
   }
@@ -4943,7 +4943,7 @@ function renderWarehouseStatus() {
   const summary = parts.length
     ? `Tableau data on file: ${parts.join(' and ')}` +
       (WH.meta ? ` · last upload ${DR.esc(WH.meta.file)} on ${new Date(WH.meta.at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}` : '') +
-      (WH.db ? ' · saved for everyone' : ' · <span title="Run docs/warehouse_daily.sql in Supabase to share it with everyone">saved in this browser only</span>')
+      (WH.db ? ' · saved for everyone' : ' · <span title="Run docs/tableau_data.sql in Supabase to share it with everyone">saved in this browser only</span>')
     : 'No Tableau data yet — the report below uses SMS Edge same-day conversions only.';
   st.innerHTML = (WH.lastMsg ? WH.lastMsg + '<br>' : '') + summary;
 }
