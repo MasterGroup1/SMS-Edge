@@ -645,10 +645,10 @@ tbody tr:hover{background:#F8FAFC}
       <div class="dr-tiles" id="dr-wh-day-tiles"></div>
     </div>
 
-    <div class="dr-sec">Month to date · SMS Edge</div>
+    <div class="dr-sec">Month to date (<span class="dr-month-name"></span>) · SMS Edge</div>
     <div class="dr-tiles" id="dr-mtd-tiles"></div>
     <div id="dr-wh-mtd-wrap" style="display:none">
-      <div class="dr-sec">Month to date · Tableau</div>
+      <div class="dr-sec">Month to date (<span class="dr-month-name"></span>) · Tableau</div>
       <div class="dr-tiles" id="dr-wh-mtd-tiles"></div>
     </div>
 
@@ -697,14 +697,14 @@ tbody tr:hover{background:#F8FAFC}
 
     <div class="dr-two" style="margin-top:16px">
       <div class="card">
-        <div class="card-title dr-ct">By brand · this month</div>
+        <div class="card-title dr-ct">By brand · <span class="dr-month-name"></span> to date</div>
         <div class="dr-wrap"><table class="dr-table">
           <thead><tr><th>Brand</th><th>Spend</th><th>Leads</th><th>Sales</th><th>Per lead</th><th>Per sale</th><th>Status</th></tr></thead>
           <tbody id="dr-brands"></tbody>
         </table></div>
       </div>
       <div class="card">
-        <div class="card-title dr-ct">By country · this month</div>
+        <div class="card-title dr-ct">By country · <span class="dr-month-name"></span> to date</div>
         <div class="dr-wrap"><table class="dr-table">
           <thead><tr><th>Country</th><th>Spend</th><th>Leads</th><th>Sales</th><th>Per lead</th><th>Per sale</th><th>Status</th></tr></thead>
           <tbody id="dr-countries"></tbody>
@@ -4681,29 +4681,37 @@ function renderDailyReport() {
 
   const prevDay = days[days.indexOf(day) + 1] || null;
   const [y, m, dd] = day.split('-').map(Number);
-  const dim = new Date(Date.UTC(y, m, 0)).getUTCDate();
   const shift = n => new Date(Date.UTC(y, m - 1, dd - n)).toISOString().slice(0, 10);
-  const monthKey = day.slice(0, 7);
-  const prevMonthKey = new Date(Date.UTC(y, m - 2, 1)).toISOString().slice(0, 7);
   const upTo = rows.filter(r => r.d <= day);
   const between = (a, b) => upTo.filter(r => r.d >= a && r.d <= b);
 
+  // "Month to date" is always the month we are in (not the picked report day's month)
+  const now = new Date();
+  const cur = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const [cy, cm, cd] = cur.split('-').map(Number);
+  const dim = new Date(Date.UTC(cy, cm, 0)).getUTCDate();
+  const monthKey = cur.slice(0, 7);
+  const monthName = DR.monthLabel(monthKey);
+  const prevMonthKey = new Date(Date.UTC(cy, cm - 2, 1)).toISOString().slice(0, 7);
+  const toNow = rows.filter(r => r.d <= cur);
+
   const D = DR.sum(upTo.filter(r => r.d === day));
   const P = DR.sum(prevDay ? upTo.filter(r => r.d === prevDay) : []);
-  const mtdRows = upTo.filter(r => r.d.startsWith(monthKey));
+  const mtdRows = toNow.filter(r => r.d.startsWith(monthKey));
   const MTD = DR.sum(mtdRows);
-  const f = dim / dd;
+  const f = dim / cd;
   const RR = { spend: MTD.spend * f, leads: MTD.leads * f, sales: MTD.sales * f };
   const PM = DR.sum(rows.filter(r => r.d.startsWith(prevMonthKey)));
   const L7 = DR.sum(between(shift(6), day));
   const P7 = DR.sum(between(shift(13), shift(7)));
-  const ALL = DR.sum(upTo);
+  const ALL = DR.sum(toNow);
+  document.querySelectorAll('#dailyreport .dr-month-name').forEach(el => { el.textContent = monthName; });
 
   // Lede
   document.getElementById('dr-lede').innerHTML =
     `On <b>${DR.dayLabel(day)}</b> we sent <b>${DR.int(D.campaigns)}</b> campaigns (<b>${DR.int(D.sent)}</b> SMS) for <b>${DR.eur(D.spend)}</b>, ` +
     `bringing <b>${DR.int(D.leads)}</b> lead${D.leads === 1 ? "" : "s"} and <b>${DR.int(D.sales)}</b> sale${D.sales === 1 ? "" : "s"}. ` +
-    `Month to date: <b>${DR.eur(MTD.spend)}</b> spend, <b>${DR.int(MTD.sales)}</b> sales` +
+    `${monthName} to date: <b>${DR.eur(MTD.spend)}</b> spend, <b>${DR.int(MTD.sales)}</b> sales` +
     (MTD.cpa != null ? ` at <b>${DR.eur(MTD.cpa)}</b> per sale` : '') +
     `; on pace for <b>${DR.eur(RR.spend)}</b> and <b>${DR.int(RR.sales)}</b> sales this month.`;
 
@@ -4755,7 +4763,7 @@ function renderDailyReport() {
       whTile('NGR', DR.eur(whD.ngr), `GGR ${DR.eur(whD.ggr)}`),
       whTile('NGR ÷ spend', x(D.spend ? whD.ngr / D.spend : null), `on ${DR.eur(D.spend)} SMS spend`),
     ].join('');
-  const mDays = calDays(monthKey + '-01', day);
+  const mDays = calDays(monthKey + '-01', cur);
   let whM = whSum(mDays);
   const hasMonths = Object.keys(WH.months).length > 0;
   const mRow = WH.months[monthKey];
@@ -4781,11 +4789,11 @@ function renderDailyReport() {
   ])].filter(m => m <= monthKey).sort().reverse();
   document.getElementById('dr-mon-card').style.display = (hasWH || hasMonths) ? '' : 'none';
   const monStats = allMonths.map(m => {
-    const s = DR.sum(upTo.filter(r => r.d.startsWith(m)));
+    const s = DR.sum(toNow.filter(r => r.d.startsWith(m)));
     let w = null, src = '';
     if (WH.months[m]) { w = WH.months[m]; src = 'Monthly file'; }
     else {
-      const ds = Object.keys(WH.rows).filter(d => d.startsWith(m) && d <= day);
+      const ds = Object.keys(WH.rows).filter(d => d.startsWith(m) && d <= cur);
       if (ds.length) { w = whSum(ds); src = `Daily file (${ds.length} days)`; }
     }
     return { m, s, w, src };
@@ -4853,8 +4861,8 @@ function renderDailyReport() {
   }
 
   // Breakdowns (this month to the report day, plus all time to the report day)
-  const brands = DR.breakdown(upTo, 'b', monthKey);
-  const countries = DR.breakdown(upTo, 'co', monthKey);
+  const brands = DR.breakdown(toNow, 'b', monthKey);
+  const countries = DR.breakdown(toNow, 'co', monthKey);
   const pillCls = { 'Converting': 'good', 'Leads, no sales': 'warn', 'No leads': 'bad', 'Not sending': '' };
   const bdRows = list => list.filter(x => x.flag !== 'Not sending').map(x => `<tr>
       <td>${DR.esc(x.key)}</td><td>${DR.eur(x.now.spend)}</td><td>${DR.int(x.now.leads)}</td><td>${DR.int(x.now.sales)}</td>
@@ -4879,9 +4887,9 @@ function renderDailyReport() {
     F.push({ c: D.sales >= P.sales ? 'g' : 'y', t: `<b>Day over day:</b> ${DR.int(D.sales)} sale${D.sales === 1 ? "" : "s"} (${s >= 0 ? '+' : ''}${s}) and ${DR.int(D.leads)} lead${D.leads === 1 ? "" : "s"} (${l >= 0 ? '+' : ''}${l}) on ${DR.eur(D.spend)} spend, vs ${DR.eur(P.spend)} the previous send day.` });
   }
   if (MTD.cpa != null && ALL.cpa != null && MTD.cpa > ALL.cpa * 1.2)
-    F.push({ c: 'r', t: `<b>Cost per sale is up:</b> ${DR.eur(MTD.cpa)} this month vs ${DR.eur(ALL.cpa)} all time.` });
+    F.push({ c: 'r', t: `<b>Cost per sale is up:</b> ${DR.eur(MTD.cpa)} in ${monthName} vs ${DR.eur(ALL.cpa)} all time.` });
   else if (MTD.cpa != null && ALL.cpa != null && MTD.cpa < ALL.cpa * 0.85)
-    F.push({ c: 'g', t: `<b>Cost per sale is improving:</b> ${DR.eur(MTD.cpa)} this month vs ${DR.eur(ALL.cpa)} all time.` });
+    F.push({ c: 'g', t: `<b>Cost per sale is improving:</b> ${DR.eur(MTD.cpa)} in ${monthName} vs ${DR.eur(ALL.cpa)} all time.` });
   if (tS && tW) {
     const lateT = tW.ftds - tS.sales;
     const first = both[both.length - 1].m;
@@ -4889,14 +4897,14 @@ function renderDailyReport() {
   }
   if ((hasWH || mtdFromMonthly) && (whM.days || mtdFromMonthly)) {
     const lateN = whM.ftds - MTD.sales;
-    F.push({ c: 'g', t: `<b>Late conversions:</b> Tableau shows <b>${DR.int(whM.ftds)}</b> FTDs this month vs ${DR.int(MTD.sales)} same-day sales in SMS Edge (${lateN >= 0 ? '+' : ''}${DR.int(lateN)}), so the real cost per FTD is <b>${DR.eur(whM.ftds ? MTD.spend / whM.ftds : null)}</b>, not ${DR.eur(MTD.cpa)}.` });
+    F.push({ c: 'g', t: `<b>Late conversions:</b> Tableau shows <b>${DR.int(whM.ftds)}</b> FTDs in ${monthName} vs ${DR.int(MTD.sales)} same-day sales in SMS Edge (${lateN >= 0 ? '+' : ''}${DR.int(lateN)}), so the real cost per FTD is <b>${DR.eur(whM.ftds ? MTD.spend / whM.ftds : null)}</b>, not ${DR.eur(MTD.cpa)}.` });
     if (MTD.spend) {
       const r = whM.ngr / MTD.spend;
-      F.push({ c: r >= 1 ? 'g' : 'r', t: `<b>NGR ÷ spend this month: ${x(r)}</b> (${DR.eur(whM.ngr)} NGR on ${DR.eur(MTD.spend)} spend)${!mtdFromMonthly && whM.days < mDays.length ? ` — Tableau covers ${whM.days} of ${mDays.length} days` : ''}.` });
+      F.push({ c: r >= 1 ? 'g' : 'r', t: `<b>NGR ÷ spend in ${monthName}: ${x(r)}</b> (${DR.eur(whM.ngr)} NGR on ${DR.eur(MTD.spend)} spend)${!mtdFromMonthly && whM.days < mDays.length ? ` — Tableau covers ${whM.days} of ${mDays.length} days` : ''}.` });
     }
   }
   if (MTD.spend > 0 && MTD.sales === 0)
-    F.push({ c: 'r', t: `<b>No sales yet this month</b> on ${DR.eur(MTD.spend)} spend.` });
+    F.push({ c: 'r', t: `<b>No sales yet in ${monthName}</b> on ${DR.eur(MTD.spend)} spend.` });
 
   const deadCountries = countries.filter(x => x.all.spend >= 500 && x.all.sales === 0).map(x => ({ key: x.key, v: x.all.spend }));
   if (deadCountries.length) {
@@ -4905,7 +4913,7 @@ function renderDailyReport() {
   }
   const stopBrands = brands.filter(x => x.now.spend >= 500 && x.now.sales === 0).map(x => ({ key: x.key, v: x.now.spend }));
   if (stopBrands.length) {
-    F.push({ c: 'y', t: `<b>Brands over €500 this month with no sale:</b> ${names(stopBrands)}.` });
+    F.push({ c: 'y', t: `<b>Brands over €500 in ${monthName} with no sale:</b> ${names(stopBrands)}.` });
     A.push(`Apply the stop rule (pause a brand after €500 with no sale) to ${stopBrands.map(x => DR.esc(x.key)).join(', ')}.`);
   }
   const noLeads = [...brands, ...countries].filter(x => x.all.spend >= 200 && x.all.leads === 0 && x.flag !== 'Not sending').map(x => ({ key: x.key, v: x.all.spend }));
@@ -4922,7 +4930,7 @@ function renderDailyReport() {
   const bestBrands = brands.filter(x => x.now.sales > 0).sort((a, b) => a.now.cpa - b.now.cpa).slice(0, 3);
   if (best.length) {
     F.push({ c: 'g', t: `<b>What works:</b> ${best.map(x => `<b>${DR.esc(x.key)}</b> ${DR.int(x.all.sales)} sales at ${DR.eur(x.all.cpa)} each`).join('; ')}` +
-      (bestBrands.length ? `. Best brands this month: ${bestBrands.map(x => `<b>${DR.esc(x.key)}</b> (${DR.int(x.now.sales)} sale${x.now.sales === 1 ? "" : "s"}, ${DR.eur(x.now.cpa)} per sale)`).join(', ')}.` : '.') });
+      (bestBrands.length ? `. Best brands in ${monthName}: ${bestBrands.map(x => `<b>${DR.esc(x.key)}</b> (${DR.int(x.now.sales)} sale${x.now.sales === 1 ? "" : "s"}, ${DR.eur(x.now.cpa)} per sale)`).join(', ')}.` : '.') });
     A.push(`Move freed-up budget to ${best.map(x => DR.esc(x.key)).join(' and ')}${bestBrands.length ? ' (' + bestBrands.map(x => DR.esc(x.key)).join(', ') + ')' : ''} — lowest cost per sale.`);
   }
   if (L7.spend && P7.spend && L7.spend > P7.spend * 1.2 && !(L7.sales > P7.sales))
