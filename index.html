@@ -4948,35 +4948,77 @@ function renderDailyReport() {
   if (MTD.spend > 0 && MTD.sales === 0)
     F.push({ c: 'r', t: `<b>No sales yet in ${monthName}</b> on ${DR.eur(MTD.spend)} spend.` });
 
-  const deadCountries = countries.filter(x => x.all.spend >= 500 && x.all.sales === 0).map(x => ({ key: x.key, v: x.all.spend }));
-  if (deadCountries.length) {
-    F.push({ c: 'r', t: `<b>Countries with €500+ spent and never a sale:</b> ${names(deadCountries)}.` });
-    A.push(`Cap or pause sends to ${deadCountries.map(x => DR.esc(x.key)).join(', ')} until the offer or landing page is reviewed.`);
+  // Only the markets we actually send to get market-level findings/actions
+  const DR_MARKETS = ['Australia', 'New Zealand', 'Ireland', 'Canada', 'Italy', 'Norway'];
+  const mkts = countries.filter(x => DR_MARKETS.includes(x.key));
+  const mtdCpa = MTD.cpa;
+
+  // 1. Markets spending with no sale this month
+  const deadMkts = mkts.filter(x => x.now.spend >= 500 && x.now.sales === 0);
+  if (deadMkts.length) {
+    F.push({ c: 'r', t: `<b>Markets with €500+ in ${monthName} and no sale:</b> ${deadMkts.map(x => `<b>${DR.esc(x.key)}</b> ${DR.eur(x.now.spend)}`).join(', ')}.` });
+    A.push(`Cut sends to ${deadMkts.map(x => DR.esc(x.key)).join(', ')} until a sale comes in: ${deadMkts.map(x => `${DR.eur(x.now.spend)} spent in ${monthName}, 0 sales`).join('; ')}.`);
   }
-  const stopBrands = brands.filter(x => x.now.spend >= 500 && x.now.sales === 0).map(x => ({ key: x.key, v: x.now.spend }));
-  if (stopBrands.length) {
-    F.push({ c: 'y', t: `<b>Brands over €500 in ${monthName} with no sale:</b> ${names(stopBrands)}.` });
-    A.push(`Apply the stop rule (pause a brand after €500 with no sale) to ${stopBrands.map(x => DR.esc(x.key)).join(', ')}.`);
+  // 2. Best vs worst market this month → budget shift
+  const ranked = mkts.filter(x => x.now.sales >= 2).sort((a, b) => a.now.cpa - b.now.cpa);
+  const worst = mkts.filter(x => x.now.spend >= 300 && !deadMkts.includes(x) && (x.now.sales === 0 || (mtdCpa && x.now.cpa > mtdCpa * 1.4)))
+    .sort((a, b) => (b.now.cpa || Infinity) - (a.now.cpa || Infinity));
+  if (ranked.length) {
+    F.push({ c: 'g', t: `<b>Best markets in ${monthName}:</b> ${ranked.slice(0, 3).map(x => `<b>${DR.esc(x.key)}</b> ${DR.int(x.now.sales)} sales at ${DR.eur(x.now.cpa)}`).join('; ')}.` });
+    const to = ranked.slice(0, 2).map(x => `${DR.esc(x.key)} (${DR.eur(x.now.cpa)} per sale)`).join(' and ');
+    A.push(worst.length
+      ? `Shift budget from ${worst.slice(0, 2).map(x => `${DR.esc(x.key)} (${x.now.sales ? DR.eur(x.now.cpa) + ' per sale' : 'no sales'})`).join(' and ')} to ${to}.`
+      : `Scale ${to}: lowest cost per sale in ${monthName}.`);
   }
-  const noLeads = [...brands, ...countries].filter(x => x.all.spend >= 200 && x.all.leads === 0 && x.flag !== 'Not sending').map(x => ({ key: x.key, v: x.all.spend }));
-  if (noLeads.length) {
-    F.push({ c: 'y', t: `<b>Sending with no leads at all:</b> ${names(noLeads)} (all-time spend).` });
-    A.push(`Pause ${noLeads.map(x => DR.esc(x.key)).join(', ')} — no leads to show for the spend.`);
+  if (worst.length) {
+    F.push({ c: 'y', t: `<b>Expensive markets in ${monthName}:</b> ${worst.map(x => `<b>${DR.esc(x.key)}</b> ${x.now.sales ? DR.eur(x.now.cpa) + ' per sale' : DR.eur(x.now.spend) + ', no sales'}`).join('; ')}${mtdCpa ? ` (average ${DR.eur(mtdCpa)})` : ''}.` });
   }
-  const leaky = countries.filter(x => x.all.leads >= 20 && x.all.sales === 0);
+  // 3. Leads but no sales (market level)
+  const leaky = mkts.filter(x => x.now.leads >= 30 && x.now.sales === 0);
   if (leaky.length) {
-    F.push({ c: 'y', t: `<b>Leads not turning into sales:</b> ${leaky.map(x => `<b>${DR.esc(x.key)}</b> ${DR.int(x.all.leads)} leads, 0 sales`).join('; ')}.` });
-    A.push(`Check lead quality and sale tracking for ${leaky.map(x => DR.esc(x.key)).join(', ')}.`);
+    F.push({ c: 'y', t: `<b>Leads not turning into sales:</b> ${leaky.map(x => `<b>${DR.esc(x.key)}</b> ${DR.int(x.now.leads)} leads, 0 sales in ${monthName}`).join('; ')}.` });
+    A.push(`Check the brand offer and sale tracking for ${leaky.map(x => DR.esc(x.key)).join(', ')}. Leads are coming in but none convert.`);
   }
-  const best = countries.filter(x => x.all.sales >= 3 && x.all.cpa != null).sort((a, b) => a.all.cpa - b.all.cpa).slice(0, 2);
-  const bestBrands = brands.filter(x => x.now.sales > 0).sort((a, b) => a.now.cpa - b.now.cpa).slice(0, 3);
-  if (best.length) {
-    F.push({ c: 'g', t: `<b>What works:</b> ${best.map(x => `<b>${DR.esc(x.key)}</b> ${DR.int(x.all.sales)} sales at ${DR.eur(x.all.cpa)} each`).join('; ')}` +
-      (bestBrands.length ? `. Best brands in ${monthName}: ${bestBrands.map(x => `<b>${DR.esc(x.key)}</b> (${DR.int(x.now.sales)} sale${x.now.sales === 1 ? "" : "s"}, ${DR.eur(x.now.cpa)} per sale)`).join(', ')}.` : '.') });
-    A.push(`Move freed-up budget to ${best.map(x => DR.esc(x.key)).join(' and ')}${bestBrands.length ? ' (' + bestBrands.map(x => DR.esc(x.key)).join(', ') + ')' : ''} — lowest cost per sale.`);
+  // 4. Markets gone quiet (converted before, no sends in the last 7 days)
+  const since7 = new Date(Date.UTC(cy, cm - 1, cd - 6)).toISOString().slice(0, 10);
+  const quiet = mkts.filter(x => x.all.sales > 0 && !toNow.some(r => r.co === x.key && r.d >= since7));
+  const neverSent = DR_MARKETS.filter(mk => !countries.some(x => x.key === mk));
+  if (quiet.length) A.push(`Restart sends to ${quiet.map(x => `${DR.esc(x.key)} (${DR.eur(x.all.cpa)} per sale all time)`).join(', ')}: no sends in the last 7 days.`);
+  if (neverSent.length) F.push({ c: 'y', t: `<b>No sends on record for:</b> ${neverSent.map(DR.esc).join(', ')}.` });
+
+  // 5. Lists this month: best to re-send, worst to retire
+  const byList = {};
+  mtdRows.forEach(r => { const k = (r.list || r.rawList || '').trim(); if (k) (byList[k] = byList[k] || []).push(r); });
+  const lists = Object.entries(byList).map(([k, rs]) => ({ key: k, ...DR.sum(rs) }));
+  const bestLists = lists.filter(l => l.sales >= 2).sort((a, b) => a.cpa - b.cpa).slice(0, 4);
+  const deadLists = lists.filter(l => l.spend >= 150 && l.sales === 0).sort((a, b) => b.spend - a.spend).slice(0, 5);
+  if (bestLists.length) A.push(`Re-send the best lists of ${monthName}: ${bestLists.map(l => `<b>${DR.esc(l.key)}</b> (${l.sales} sales, ${DR.eur(l.cpa)} each)`).join(', ')}.`);
+  if (deadLists.length) {
+    F.push({ c: 'y', t: `<b>Lists spending with no sale in ${monthName}:</b> ${deadLists.length} lists, ${DR.eur(deadLists.reduce((a, l) => a + l.spend, 0))} together.` });
+    A.push(`Set Use Again to "No" in List Performance for ${deadLists.map(l => `<b>${DR.esc(l.key)}</b> (${DR.eur(l.spend)}, 0 sales)`).join(', ')}.`);
   }
-  if (L7.spend && P7.spend && L7.spend > P7.spend * 1.2 && !(L7.sales > P7.sales))
+
+  // 6. Brands
+  const stopBrands = brands.filter(x => x.now.spend >= 500 && x.now.sales === 0);
+  if (stopBrands.length) {
+    F.push({ c: 'y', t: `<b>Brands over €500 in ${monthName} with no sale:</b> ${stopBrands.map(x => `<b>${DR.esc(x.key)}</b> ${DR.eur(x.now.spend)}`).join(', ')}.` });
+    A.push(`Pause ${stopBrands.map(x => DR.esc(x.key)).join(', ')} under the stop rule (€500 spent with no sale).`);
+  }
+  const bestBrands = brands.filter(x => x.now.sales >= 2).sort((a, b) => a.now.cpa - b.now.cpa).slice(0, 3);
+  if (bestBrands.length) A.push(`Give more sends to ${bestBrands.map(x => `<b>${DR.esc(x.key)}</b> (${x.now.sales} sales, ${DR.eur(x.now.cpa)} each)`).join(', ')}: best brands in ${monthName}.`);
+
+  // 7. Trend checks
+  if (L7.ctr != null && P7.ctr != null && P7.ctr > 0 && L7.ctr < P7.ctr * 0.85) {
+    F.push({ c: 'y', t: `<b>Click rate is down:</b> ${DR.pct(L7.ctr)} in the last 7 days vs ${DR.pct(P7.ctr)} the week before.` });
+    A.push(`Refresh the SMS copy and check routes. Click rate fell from ${DR.pct(P7.ctr)} to ${DR.pct(L7.ctr)} week on week.`);
+  }
+  if (L7.spend && P7.spend && L7.spend > P7.spend * 1.2 && !(L7.sales > P7.sales)) {
     F.push({ c: 'r', t: `<b>Spend is growing faster than sales:</b> last 7 days ${DR.eur(L7.spend)} (was ${DR.eur(P7.spend)}) for ${DR.int(L7.sales)} sales (was ${DR.int(P7.sales)}).` });
+    A.push(`Hold daily spend at last week's level (${DR.eur(P7.spend / 7)} a day) until sales catch up.`);
+  }
+  if ((hasWH || mtdFromMonthly) && whM.ftds > MTD.sales * 1.15 && MTD.sales > 0)
+    A.push(`Judge lists on Tableau FTDs, not same-day sales: ${Math.round((whM.ftds - MTD.sales) / whM.ftds * 100)}% of ${monthName}'s FTDs came in late, so wait 2–3 days before marking a list "No".`);
+  if (!A.length) A.push('No changes needed. Keep the current allocation and check again tomorrow.');
 
   document.getElementById('dr-findings').innerHTML = F.map(x => `<li class="${x.c}"><span>${x.t}</span></li>`).join('') || '<li><span>Nothing stands out.</span></li>';
   document.getElementById('dr-actions').innerHTML = A.map(t => `<li><span>${t}</span></li>`).join('') || '<li><span>No actions suggested — keep current allocation.</span></li>';
