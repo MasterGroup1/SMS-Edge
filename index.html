@@ -370,6 +370,7 @@ tbody tr:hover{background:#F8FAFC}
   <div class="sidebar-nav">
     <div class="nav-section">Analytics</div>
     <div class="nav-item active" data-tab="overview">📊 Dashboard</div>
+    <div class="nav-item" data-tab="dailyreport">📰 Daily Report</div>
     <div class="nav-item" data-tab="countries">🌍 Countries</div>
     <div class="nav-item" data-tab="brands">🏷️ Brands</div>
     <div class="nav-item" data-tab="lists">📋 List Performance</div>
@@ -457,7 +458,7 @@ tbody tr:hover{background:#F8FAFC}
       </div>
       <button id="seedBtn" onclick="resyncDatabase()" title="Replace every campaign record in the database with the dashboard's current data — use this after the underlying campaign data has been updated" style="background:#7C3AED;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">Resync Data</button>
       <button onclick="document.getElementById('globalCsvInput').click()" title="Import a campaign CSV from anywhere in the dashboard — no need to switch to the Dashboard tab" style="background:#0EA5E9;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">📁 Upload CSV</button>
-      <input id="globalCsvInput" type="file" accept=".csv" style="display:none" onchange="handleFileUpload(event)">
+      <input id="globalCsvInput" type="file" accept=".csv,.tsv,.txt,.xlsx,.xls,.xlsm" multiple style="display:none" onchange="handleFileUpload(event)">
     </div>
   </div>
 
@@ -501,7 +502,7 @@ tbody tr:hover{background:#F8FAFC}
         <div><div class="card-title">Import Data</div></div>
       </div>
       <div class="upload-zone" id="uploadZone">
-        <input id="csvInput" type="file" accept=".csv" onchange="handleFileUpload(event)"/>
+        <input id="csvInput" type="file" accept=".csv,.tsv,.txt,.xlsx,.xls,.xlsm" multiple onchange="handleFileUpload(event)"/>
         <div style="pointer-events:none">
           <div style="font-size:18px;margin-bottom:8px">📁</div>
           <div style="font-weight:600;color:#0F172A">Drag CSV here or click to select</div>
@@ -573,6 +574,145 @@ tbody tr:hover{background:#F8FAFC}
       </div>
     </div>
 
+  </div>
+
+  <!-- DAILY REPORT TAB -->
+  <div id="dailyreport" class="page">
+    <style>
+      .dr-head{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:18px}
+      .dr-title{font-size:22px;font-weight:800;color:#0F172A;margin:0}
+      .dr-lede{font-size:14px;color:#334155;line-height:1.6;max-width:820px;margin:6px 0 0}
+      .dr-lede b{color:#0F172A}
+      .dr-pick{display:flex;align-items:center;gap:8px;font-size:12px;color:#64748B}
+      .dr-pick select{border:1.5px solid #E2E8F0;border-radius:8px;padding:7px 10px;font-size:13px;background:#fff}
+      .dr-sec{font-size:12px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:.05em;margin:22px 0 10px}
+      .dr-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+      .dr-tile{background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:14px 16px;min-width:0}
+      .dr-tile .l{font-size:11px;color:#64748B;font-weight:600;text-transform:uppercase;letter-spacing:.03em}
+      .dr-tile .v{font-size:24px;font-weight:800;color:#0F172A;margin-top:4px;font-variant-numeric:tabular-nums}
+      .dr-tile .s{font-size:11px;color:#64748B;margin-top:4px;font-variant-numeric:tabular-nums}
+      .dr-chg{display:inline-block;font-weight:700;padding:1px 6px;border-radius:999px;background:#F1F5F9;color:#64748B}
+      .dr-chg.good{background:#DCFCE7;color:#16A34A}
+      .dr-chg.bad{background:#FEE2E2;color:#DC2626}
+      .dr-two{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px}
+      .dr-list{list-style:none;margin:0;padding:0;display:grid;gap:10px;font-size:13px;line-height:1.5;color:#334155}
+      .dr-list li{display:grid;grid-template-columns:12px 1fr;gap:8px}
+      .dr-list li::before{content:"";width:8px;height:8px;border-radius:50%;margin-top:6px;background:#94A3B8}
+      .dr-list li.r::before{background:#DC2626}.dr-list li.y::before{background:#F59E0B}.dr-list li.g::before{background:#16A34A}
+      .dr-list b{color:#0F172A}
+      .dr-acts{counter-reset:a}
+      .dr-acts li{counter-increment:a}
+      .dr-acts li::before{content:counter(a);width:auto;height:auto;background:none;margin:0;font-weight:700;color:#64748B}
+      .dr-wrap{overflow-x:auto}
+      .dr-table{width:100%;border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums}
+      .dr-table th{text-align:right;color:#64748B;font-weight:600;padding:6px 8px;border-bottom:1px solid #E2E8F0;white-space:nowrap}
+      .dr-table td{text-align:right;padding:6px 8px;border-bottom:1px solid #F1F5F9;white-space:nowrap}
+      .dr-table th:first-child,.dr-table td:first-child{text-align:left}
+      .dr-table td.m{color:#94A3B8}
+      .dr-pill{display:inline-block;font-size:11px;padding:1px 8px;border-radius:999px;border:1px solid currentColor;color:#64748B}
+      .dr-pill.good{color:#16A34A}.dr-pill.bad{color:#DC2626}.dr-pill.warn{color:#D97706}
+      .dr-empty{color:#94A3B8;font-size:13px;padding:8px 0}
+      .dr-notes{font-size:12px;color:#64748B;margin-top:18px}
+      #dailyreport .dr-ct{margin-bottom:12px;text-align:left}
+      .dr-sub{font-size:12px;color:#64748B;margin:-6px 0 10px}
+      .dr-drop{border:2px dashed #93C5FD;background:#F8FBFF;border-radius:12px;padding:14px 18px;cursor:pointer;font-size:13px;color:#334155;transition:background .15s}
+      .dr-drop.over{background:#DBEAFE;border-color:#1D4ED8}
+      .dr-drop-status{font-size:12px;color:#64748B;margin-top:6px}
+      .dr-drop-status .ok{color:#16A34A;font-weight:600}.dr-drop-status .err{color:#DC2626;font-weight:600}
+      .dr-table .m{color:#94A3B8}
+      .dr-tile.wh{background:#FFFBEB;border-color:#FDE68A}
+    </style>
+    <div class="tabs"><div class="tab active" data-tab="dailyreport">Daily Report</div></div>
+
+    <div class="dr-head">
+      <div>
+        <h1 class="dr-title">Daily Report</h1>
+        <p class="dr-lede" id="dr-lede">Loading…</p>
+      </div>
+      <label class="dr-pick">Report day <select id="dr-day" onchange="renderDailyReport()"></select></label>
+    </div>
+
+    <div class="dr-drop" id="dr-drop" onclick="document.getElementById('dr-file').click()">
+      <input type="file" id="dr-file" accept=".csv,.tsv,.txt,.xlsx,.xls,.xlsm" multiple style="display:none" onchange="handleReportFiles(this.files); this.value=''">
+      <div class="dr-drop-main">📥 <b>Drop files here</b> or click to choose: the <b>Tableau</b> export (daily warehouse data) and/or the <b>SMS Edge</b> campaigns export. CSV or Excel, one or both at once.</div>
+      <div class="dr-drop-status" id="dr-wh-status"></div>
+    </div>
+
+    <div class="dr-sec">The day · SMS Edge (same-day)</div>
+    <div class="dr-tiles" id="dr-day-tiles"></div>
+    <div id="dr-wh-day-wrap" style="display:none">
+      <div class="dr-sec">The day · Tableau warehouse (incl. late conversions)</div>
+      <div class="dr-tiles" id="dr-wh-day-tiles"></div>
+    </div>
+
+    <div class="dr-sec">Month to date · SMS Edge</div>
+    <div class="dr-tiles" id="dr-mtd-tiles"></div>
+    <div id="dr-wh-mtd-wrap" style="display:none">
+      <div class="dr-sec">Month to date · Tableau warehouse</div>
+      <div class="dr-tiles" id="dr-wh-mtd-tiles"></div>
+    </div>
+
+    <div class="dr-sec">Last 7 days vs the 7 before</div>
+    <div class="dr-tiles" id="dr-l7-tiles"></div>
+
+    <div class="dr-sec">Last 30 send days</div>
+    <div class="card"><div style="position:relative;height:260px"><canvas id="dr-trend"></canvas></div></div>
+
+    <div class="card" id="dr-cmp-card" style="margin-top:16px;display:none">
+      <div class="card-title dr-ct">SMS Edge vs Tableau by day</div>
+      <div class="dr-sub">SMS Edge counts conversions on the day of the send; Tableau adds the ones that came in later. "Late" = Tableau minus SMS Edge.</div>
+      <div class="dr-wrap"><table class="dr-table">
+        <thead><tr><th>Day</th><th>Spend</th><th>SMS leads</th><th>Tableau regs</th><th>SMS sales</th><th>Tableau FTDs</th><th>Late FTDs</th><th>Cost per FTD</th><th>First deposits</th><th>All deposits</th><th>NGR</th><th>NGR ÷ spend</th></tr></thead>
+        <tbody id="dr-cmp"></tbody>
+      </table></div>
+    </div>
+
+    <div class="dr-two" style="margin-top:16px">
+      <div class="card">
+        <div class="card-title dr-ct">Key findings</div>
+        <ul class="dr-list" id="dr-findings"></ul>
+      </div>
+      <div class="card">
+        <div class="card-title dr-ct">Suggested actions</div>
+        <ol class="dr-list dr-acts" id="dr-actions"></ol>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <div class="card-title dr-ct" id="dr-camps-title">Campaigns sent</div>
+      <div class="dr-wrap"><table class="dr-table">
+        <thead><tr><th>Campaign</th><th>Brand</th><th>Country</th><th>Sent</th><th>Clicks</th><th>Click rate</th><th>Leads</th><th>Sales</th><th>Spend</th></tr></thead>
+        <tbody id="dr-camps"></tbody>
+      </table></div>
+    </div>
+
+    <div class="dr-two" style="margin-top:16px">
+      <div class="card">
+        <div class="card-title dr-ct">By brand · this month</div>
+        <div class="dr-wrap"><table class="dr-table">
+          <thead><tr><th>Brand</th><th>Spend</th><th>Leads</th><th>Sales</th><th>Per lead</th><th>Per sale</th><th>Status</th></tr></thead>
+          <tbody id="dr-brands"></tbody>
+        </table></div>
+      </div>
+      <div class="card">
+        <div class="card-title dr-ct">By country · this month</div>
+        <div class="dr-wrap"><table class="dr-table">
+          <thead><tr><th>Country</th><th>Spend</th><th>Leads</th><th>Sales</th><th>Per lead</th><th>Per sale</th><th>Status</th></tr></thead>
+          <tbody id="dr-countries"></tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <details class="dr-notes">
+      <summary>How these numbers are worked out</summary>
+      <ul>
+        <li>Built from the campaigns in this dashboard, so it updates every time campaigns are uploaded. Test sends (campaign or list named "test") and campaigns with 0 sent are left out.</li>
+        <li>"The day" is compared with the previous day that had sends. Month to date runs from the 1st to the report day; run rate = month to date ÷ days elapsed × days in the month.</li>
+        <li>Per lead = spend ÷ leads. Per sale = spend ÷ sales. Click rate = clicks ÷ sent. Brand is the brand field, or the first part of the campaign name.</li>
+        <li>Tableau rows are matched to SMS Edge by date only (the export has no campaign or list column). Late FTDs = Tableau FTDs − SMS Edge sales for the same day; cost per FTD = SMS Edge spend ÷ Tableau FTDs. Re-uploading a Tableau file overwrites the days it contains, so a fresh export picks up conversions that came in late.</li>
+        <li>Findings and actions are written automatically from simple rules (e.g. €500+ spend with no sale), so read them as prompts, not decisions.</li>
+      </ul>
+    </details>
   </div>
 
   <!-- COUNTRIES TAB -->
@@ -4234,6 +4374,7 @@ function switchTab(tabName) {
   document.querySelector(`.nav-item[data-tab="${tabName}"]`)?.classList.add('active');
 
   if (tabName === 'overview') initCharts();
+  if (tabName === 'dailyreport') renderDailyReport();
   if (tabName === 'countries') renderCountriesTable();
   if (tabName === 'brands') renderBrandsTable();
   if (tabName === 'lists') { renderListsTable(); renderListCharts(); renderClickerListsTable(); }
@@ -4244,6 +4385,486 @@ function switchTab(tabName) {
   if (tabName === 'routes') { renderRoutesTab(); }
   if (tabName === 'content') { renderContentTable(); }
   if (tabName === 'questions') renderQuestionsTable();
+}
+
+// ── TABLEAU WAREHOUSE + FILE ROUTER ─────────
+// One drop target for both exports, CSV or Excel:
+//  • Tableau "Daily Summary" (Date, Registrations, FTDs, deposits, NGR…) → warehouse rows by day
+//  • SMS Edge campaigns export → the normal campaign import (parseCSVData)
+// Warehouse rows are saved to the `warehouse_daily` table when it exists
+// (see docs/warehouse_daily.sql), and always to this browser as a fallback.
+const WH = { rows: {}, meta: null, db: false, loaded: false, LS: 'smsedge.warehouseDaily.v1' };
+WH.FIELDS = {
+  'date': 'date', 'day': 'date', 'registrations': 'regs', 'regs': 'regs', 'ftds': 'ftds', 'ftd': 'ftds',
+  'first deposit amount': 'firstDep', 'total deposit amount': 'deposits', 'total deposit count': 'depositCount',
+  'depositors': 'depositors', 'ngr': 'ngr', 'ggr': 'ggr', 'active players': 'active',
+  'cashout amount': 'cashout', 'bonus cost': 'bonusCost', 'logins': 'logins'
+};
+WH.norm = h => String(h == null ? '' : h).toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+WH.isHeader = row => { const n = (row || []).map(WH.norm); return n.includes('date') && (n.includes('ftds') || n.includes('registrations')); };
+WH.num = v => typeof v === 'number' ? v : (parseFloat(String(v == null ? '' : v).replace(/[€$£\s,%]/g, '')) || 0);
+WH.toISO = (v, dmy) => {
+  const pad = n => String(n).padStart(2, '0');
+  if (typeof v === 'number' && v > 20000 && v < 80000) return new Date(Date.UTC(1899, 11, 30) + Math.floor(v) * 86400000).toISOString().slice(0, 10);
+  const s = String(v == null ? '' : v).trim();
+  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return `${m[1]}-${pad(m[2])}-${pad(m[3])}`;
+  m = s.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})/);
+  if (m) {
+    let a = +m[1], b = +m[2], y = +m[3]; if (y < 100) y += 2000;
+    const [mo, d] = dmy ? [b, a] : [a, b];
+    return mo >= 1 && mo <= 12 && d >= 1 && d <= 31 ? `${y}-${pad(mo)}-${pad(d)}` : null;
+  }
+  const t = Date.parse(s);  // e.g. "November 20, 2026"
+  if (!isNaN(t) && /[a-z]/i.test(s) && /\d{4}/.test(s)) { const d = new Date(t); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
+  return null;
+};
+WH.parse = (aoa) => {
+  const hi = aoa.findIndex(r => WH.isHeader(r));
+  if (hi < 0) return null;
+  const hdr = aoa[hi], idx = {};
+  hdr.forEach((h, i) => { const k = WH.FIELDS[WH.norm(h)]; if (k && idx[k] == null) idx[k] = i; });
+  const body = aoa.slice(hi + 1).filter(r => r && r[idx.date] !== '' && r[idx.date] != null);
+  // US (M/D) unless any day-first value (first part > 12) shows the file is D/M
+  const dmy = body.some(r => { const m = String(r[idx.date]).match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-]/); return m && +m[1] > 12; });
+  const out = {};
+  body.forEach(r => {
+    const d = WH.toISO(r[idx.date], dmy);
+    if (!d) return; // skips "Grand Total" and blank rows
+    const o = {};
+    for (const [k, i] of Object.entries(idx)) if (k !== 'date') o[k] = WH.num(r[i]);
+    o.raw = {};
+    hdr.forEach((h, i) => { const key = String(h == null ? '' : h).trim(); if (key && i !== idx.date) o.raw[key] = r[i]; });
+    out[d] = o;
+  });
+  return out;
+};
+WH.load = async () => {
+  try { const j = JSON.parse(localStorage.getItem(WH.LS) || 'null'); if (j) { WH.rows = j.rows || {}; WH.meta = j.meta || null; } } catch (e) {}
+  if (typeof sb !== 'undefined' && sb) {
+    try {
+      const { data, error } = await sb.from('warehouse_daily').select('day,data,source,uploaded_at').limit(5000);
+      if (!error && Array.isArray(data)) {
+        WH.db = true;
+        data.forEach(r => { WH.rows[r.day] = r.data; });
+        const latest = data.reduce((m, r) => (!m || r.uploaded_at > m.uploaded_at ? r : m), null);
+        if (latest) WH.meta = { file: latest.source, at: latest.uploaded_at };
+      }
+    } catch (e) {}
+  }
+};
+WH.save = async (newRows, meta) => {
+  Object.assign(WH.rows, newRows);
+  WH.meta = meta;
+  try { localStorage.setItem(WH.LS, JSON.stringify({ rows: WH.rows, meta })); } catch (e) {}
+  if (typeof sb !== 'undefined' && sb) {
+    try {
+      const payload = Object.entries(newRows).map(([day, data]) => ({ day, data, source: meta.file, uploaded_at: meta.at }));
+      const { error } = await sb.from('warehouse_daily').upsert(payload, { onConflict: 'day' });
+      WH.db = !error;
+    } catch (e) { WH.db = false; }
+  }
+};
+
+let _xlsxPromise = null;
+function loadSheetJS() {
+  if (window.XLSX) return Promise.resolve(window.XLSX);
+  if (!_xlsxPromise) _xlsxPromise = new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload = () => res(window.XLSX);
+    s.onerror = () => { _xlsxPromise = null; rej(new Error('could not load the Excel reader — check the internet connection')); };
+    document.head.appendChild(s);
+  });
+  return _xlsxPromise;
+}
+
+function parseDelimited(text, delim) {
+  const rows = []; let row = [], cell = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (q) {
+      if (ch === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else q = false; }
+      else cell += ch;
+    } else if (ch === '"') q = true;
+    else if (ch === delim) { row.push(cell); cell = ''; }
+    else if (ch === '\n' || ch === '\r') { if (ch === '\r' && text[i + 1] === '\n') i++; row.push(cell); rows.push(row); row = []; cell = ''; }
+    else cell += ch;
+  }
+  if (cell !== '' || row.length) { row.push(cell); rows.push(row); }
+  return rows;
+}
+const toCSV = aoa => aoa.map(r => r.map(v => { const s = String(v == null ? '' : v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }).join(',')).join('\n');
+
+// → { aoa, csvText } for any CSV / TSV / UTF-16 Tableau CSV / Excel file
+async function readTableFile(file) {
+  const buf = await file.arrayBuffer();
+  const b = new Uint8Array(buf.slice(0, 4));
+  const isZip = b[0] === 0x50 && b[1] === 0x4B;           // .xlsx
+  const isOle = b[0] === 0xD0 && b[1] === 0xCF;           // old .xls
+  if (isZip || isOle || /\.(xlsx|xlsm|xls)$/i.test(file.name)) {
+    const XLSX = await loadSheetJS();
+    const wb = XLSX.read(buf, { type: 'array' });
+    // prefer a sheet that looks like either export, else the first
+    let ws = wb.Sheets[wb.SheetNames[0]];
+    for (const n of wb.SheetNames) {
+      const a = XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, raw: true, defval: '' }).slice(0, 10);
+      if (a.some(r => WH.isHeader(r) || (r.includes('Name') && r.includes('Sent')))) { ws = wb.Sheets[n]; break; }
+    }
+    const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' });
+    const csvText = XLSX.utils.sheet_to_csv(ws, { dateNF: 'yyyy-mm-dd hh:mm:ss' });
+    return { aoa, csvText };
+  }
+  let text;
+  if (b[0] === 0xFF && b[1] === 0xFE) text = new TextDecoder('utf-16le').decode(buf);      // Tableau crosstab CSV
+  else if (b[0] === 0xFE && b[1] === 0xFF) text = new TextDecoder('utf-16be').decode(buf);
+  else text = new TextDecoder('utf-8').decode(buf);
+  text = text.replace(/^﻿/, '');
+  const first = (text.split(/\r?\n/).find(l => l.trim()) || '');
+  const counts = { '\t': first.split('\t').length, ',': first.split(',').length, ';': first.split(';').length };
+  const delim = Object.keys(counts).sort((x, y) => counts[y] - counts[x])[0];
+  const aoa = parseDelimited(text, delim);
+  return { aoa, csvText: delim === ',' ? text : toCSV(aoa) };
+}
+
+function setUploadMsg(html, isErr) {
+  WH.lastMsg = html;
+  if (typeof renderWarehouseStatus === 'function') renderWarehouseStatus();
+  const zone = document.getElementById('uploadZone');
+  if (zone && !isErr) {
+    zone.innerHTML = `<div style="pointer-events:none"><div style="font-size:18px;margin-bottom:8px">✅</div>
+      <div style="font-weight:600;color:#16A34A">${html}</div>
+      <div style="font-size:12px;color:#64748B;margin-top:4px">Drop another file (CSV or Excel, SMS Edge or Tableau) to refresh</div></div>
+      <input id="csvInput" type="file" accept=".csv,.tsv,.txt,.xlsx,.xls,.xlsm" multiple onchange="handleFileUpload(event)" style="display:none"/>`;
+  }
+}
+
+async function handleReportFiles(fileList) {
+  const files = [...(fileList || [])];
+  if (!files.length) return;
+  const msgs = [];
+  // Tableau files first, so a campaigns file in the same drop re-renders with both
+  files.sort((a, b) => (/tableau|summary|warehouse/i.test(b.name) ? 1 : 0) - (/tableau|summary|warehouse/i.test(a.name) ? 1 : 0));
+  for (const file of files) {
+    try {
+      const { aoa, csvText } = await readTableFile(file);
+      const wh = WH.parse(aoa);
+      if (wh) {
+        const days = Object.keys(wh).sort();
+        if (!days.length) throw new Error('no dated rows found');
+        await WH.save(wh, { file: file.name, at: new Date().toISOString() });
+        msgs.push(`<span class="ok">Tableau: ${days.length} days loaded</span> (${DR.dayLabel(days[0])} – ${DR.dayLabel(days[days.length - 1])}) from ${DR.esc(file.name)}`);
+        continue;
+      }
+      const hdr = (aoa.find(r => r.some(c => String(c).trim())) || []).map(c => String(c).trim());
+      if (hdr.includes('Name') && hdr.includes('Sent')) {
+        const n = importCampaignCSVText(csvText, file);
+        if (n) msgs.push(`<span class="ok">SMS Edge: ${n} campaigns loaded</span> from ${DR.esc(file.name)}`);
+        else msgs.push(`<span class="err">${DR.esc(file.name)}: no campaign rows found</span>`);
+        continue;
+      }
+      msgs.push(`<span class="err">${DR.esc(file.name)}: not recognised</span> — expected a Tableau export (Date, Registrations, FTDs…) or an SMS Edge campaigns export (Name, Sent, Leads…)`);
+    } catch (err) {
+      console.error('Upload error', file.name, err);
+      msgs.push(`<span class="err">${DR.esc(file.name)}: ${DR.esc(err.message || err)}</span>`);
+    }
+  }
+  setUploadMsg(msgs.join('<br>'), msgs.every(m => m.includes('class="err"')));
+  if (document.getElementById('dailyreport')?.classList.contains('active')) renderDailyReport();
+}
+
+(() => {
+  const z = document.getElementById('dr-drop');
+  if (!z) return;
+  z.addEventListener('dragover', e => { e.preventDefault(); z.classList.add('over'); });
+  z.addEventListener('dragleave', () => z.classList.remove('over'));
+  z.addEventListener('drop', e => { e.preventDefault(); z.classList.remove('over'); handleReportFiles(e.dataTransfer.files); });
+})();
+
+// ── DAILY REPORT ────────────────────────────
+// Morning-report view built from the live `campaigns` array, so it refreshes
+// with every upload. Test sends and never-sent campaigns are left out.
+const DR = {
+  esc: s => String(s == null ? '' : s).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])),
+  eur: v => v == null || !isFinite(v) ? '—' : (v < 0 ? '−€' : '€') + Math.abs(Number(v)).toLocaleString('en-US', {maximumFractionDigits: 0}),
+  eur2: v => v == null || !isFinite(v) ? '—' : (v < 0 ? '−€' : '€') + Math.abs(Number(v)).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}),
+  int: v => v == null || !isFinite(v) ? '—' : Math.round(v).toLocaleString('en-US'),
+  pct: v => v == null || !isFinite(v) ? '—' : (v * 100).toFixed(2) + '%',
+  dayLabel: d => d ? new Date(d + 'T00:00:00Z').toLocaleDateString('en-GB', {weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC'}) : '—',
+  _bk: {},
+  brandOf(c) {
+    const b = c.brand || (typeof extractBrandFromName === 'function' ? extractBrandFromName(c.name) : '') || String(c.name || '').split('_')[0].trim() || 'Unknown';
+    const k = b.toLowerCase();
+    return DR._bk[k] || (DR._bk[k] = b); // one spelling per brand (PikaKasino = Pikakasino)
+  },
+  rows() {
+    return campaigns
+      .filter(c => (Number(c.sent) || 0) > 0 && /^\d{4}-\d{2}-\d{2}/.test(c.date || ''))
+      .filter(c => !/\btest\b/i.test(c.name || '') && !/\btest\b/i.test(c.rawList || c.list || ''))
+      .map(c => ({ ...c, d: c.date.slice(0, 10), b: DR.brandOf(c), co: c.country || 'Unknown' }));
+  },
+  sum(rows) {
+    const o = { campaigns: rows.length, sent: 0, clicks: 0, leads: 0, sales: 0, spend: 0 };
+    rows.forEach(r => { o.sent += +r.sent || 0; o.clicks += +r.clicks || 0; o.leads += +r.leads || 0; o.sales += +r.sales || 0; o.spend += +r.cost || 0; });
+    o.ctr = o.sent ? o.clicks / o.sent : null;
+    o.cpl = o.leads ? o.spend / o.leads : null;
+    o.cpa = o.sales ? o.spend / o.sales : null;
+    return o;
+  },
+  // change pill: dir 'up' = higher is good, 'down' = lower is good, 'none' = neutral
+  chg(a, b, dir) {
+    if (a == null || b == null || !b) return '<span class="dr-chg">—</span>';
+    const c = (a - b) / b;
+    if (Math.abs(c) < 0.005) return '<span class="dr-chg">0%</span>';
+    const good = dir === 'none' ? null : (dir === 'up' ? c > 0 : c < 0);
+    const cls = good == null ? '' : good ? 'good' : 'bad';
+    return `<span class="dr-chg ${cls}">${c > 0 ? '+' : '−'}${Math.round(Math.abs(c) * 100)}%</span>`;
+  },
+  tile: (label, value, sub) => `<div class="dr-tile"><div class="l">${label}</div><div class="v">${value}</div><div class="s">${sub || '&nbsp;'}</div></div>`,
+  breakdown(rows, key, monthKey) {
+    const groups = {};
+    rows.forEach(r => { (groups[r[key]] = groups[r[key]] || []).push(r); });
+    return Object.entries(groups).map(([k, rs]) => {
+      const now = DR.sum(rs.filter(r => r.d.startsWith(monthKey)));
+      const all = DR.sum(rs);
+      const flag = now.campaigns === 0 ? 'Not sending' : now.sales > 0 ? 'Converting' : now.leads > 0 ? 'Leads, no sales' : 'No leads';
+      return { key: k, now, all, flag };
+    }).sort((a, b) => b.now.spend - a.now.spend || b.all.spend - a.all.spend);
+  },
+};
+
+function renderDailyReport() {
+  if (!WH.loaded) { WH.loaded = true; WH.load().then(() => { if (document.getElementById('dailyreport')?.classList.contains('active')) renderDailyReport(); }); }
+  renderWarehouseStatus();
+  const rows = DR.rows();
+  const sel = document.getElementById('dr-day');
+  const days = [...new Set(rows.map(r => r.d))].sort().reverse();
+  if (!days.length) {
+    document.getElementById('dr-lede').textContent = 'No sent campaigns yet. Upload campaigns and this report fills in.';
+    return;
+  }
+  const prevSel = sel.value;
+  sel.innerHTML = days.map(d => `<option value="${d}">${DR.dayLabel(d)}</option>`).join('');
+  const day = days.includes(prevSel) ? prevSel : days[0];
+  sel.value = day;
+
+  const prevDay = days[days.indexOf(day) + 1] || null;
+  const [y, m, dd] = day.split('-').map(Number);
+  const dim = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const shift = n => new Date(Date.UTC(y, m - 1, dd - n)).toISOString().slice(0, 10);
+  const monthKey = day.slice(0, 7);
+  const prevMonthKey = new Date(Date.UTC(y, m - 2, 1)).toISOString().slice(0, 7);
+  const upTo = rows.filter(r => r.d <= day);
+  const between = (a, b) => upTo.filter(r => r.d >= a && r.d <= b);
+
+  const D = DR.sum(upTo.filter(r => r.d === day));
+  const P = DR.sum(prevDay ? upTo.filter(r => r.d === prevDay) : []);
+  const mtdRows = upTo.filter(r => r.d.startsWith(monthKey));
+  const MTD = DR.sum(mtdRows);
+  const f = dim / dd;
+  const RR = { spend: MTD.spend * f, leads: MTD.leads * f, sales: MTD.sales * f };
+  const PM = DR.sum(rows.filter(r => r.d.startsWith(prevMonthKey)));
+  const L7 = DR.sum(between(shift(6), day));
+  const P7 = DR.sum(between(shift(13), shift(7)));
+  const ALL = DR.sum(upTo);
+
+  // Lede
+  document.getElementById('dr-lede').innerHTML =
+    `On <b>${DR.dayLabel(day)}</b> we sent <b>${DR.int(D.campaigns)}</b> campaigns (<b>${DR.int(D.sent)}</b> SMS) for <b>${DR.eur(D.spend)}</b>, ` +
+    `bringing <b>${DR.int(D.leads)}</b> lead${D.leads === 1 ? "" : "s"} and <b>${DR.int(D.sales)}</b> sale${D.sales === 1 ? "" : "s"}. ` +
+    `Month to date: <b>${DR.eur(MTD.spend)}</b> spend, <b>${DR.int(MTD.sales)}</b> sales` +
+    (MTD.cpa != null ? ` at <b>${DR.eur(MTD.cpa)}</b> per sale` : '') +
+    `; on pace for <b>${DR.eur(RR.spend)}</b> and <b>${DR.int(RR.sales)}</b> sales this month.`;
+
+  // The day vs previous send day
+  const vs = prevDay ? `vs ${DR.dayLabel(prevDay).replace(/ \d{4}$/, '')}` : '';
+  document.getElementById('dr-day-tiles').innerHTML = [
+    DR.tile('Spend', DR.eur(D.spend), `${DR.chg(D.spend, P.spend, 'none')} ${vs} (${DR.eur(P.spend)})`),
+    DR.tile('SMS sent', DR.int(D.sent), `${DR.chg(D.sent, P.sent, 'none')} · ${DR.int(D.campaigns)} campaigns`),
+    DR.tile('Click rate', DR.pct(D.ctr), `${DR.chg(D.ctr, P.ctr, 'up')} ${vs} (${DR.pct(P.ctr)})`),
+    DR.tile('Leads', DR.int(D.leads), `${DR.chg(D.leads, P.leads, 'up')} ${vs} (${DR.int(P.leads)})`),
+    DR.tile('Sales', DR.int(D.sales), `${DR.chg(D.sales, P.sales, 'up')} ${vs} (${DR.int(P.sales)})`),
+    DR.tile('Per sale', DR.eur(D.cpa), `${DR.chg(D.cpa, P.cpa, 'down')} · per lead ${DR.eur(D.cpl)}`),
+  ].join('');
+
+  document.getElementById('dr-mtd-tiles').innerHTML = [
+    DR.tile('Spend', DR.eur(MTD.spend), `Run rate <b>${DR.eur(RR.spend)}</b> · last month ${DR.eur(PM.spend)}`),
+    DR.tile('Leads', DR.int(MTD.leads), `Run rate <b>${DR.int(RR.leads)}</b> · last month ${DR.int(PM.leads)}`),
+    DR.tile('Sales', DR.int(MTD.sales), `Run rate <b>${DR.int(RR.sales)}</b> · last month ${DR.int(PM.sales)}`),
+    DR.tile('Per lead', DR.eur(MTD.cpl), `All time ${DR.eur(ALL.cpl)}`),
+    DR.tile('Per sale', DR.eur(MTD.cpa), `All time ${DR.eur(ALL.cpa)}`),
+    DR.tile('Click rate', DR.pct(MTD.ctr), `${DR.int(MTD.sent)} sent · ${DR.int(MTD.campaigns)} campaigns`),
+  ].join('');
+
+  document.getElementById('dr-l7-tiles').innerHTML = [
+    DR.tile('Spend', DR.eur(L7.spend), `${DR.chg(L7.spend, P7.spend, 'none')} (was ${DR.eur(P7.spend)})`),
+    DR.tile('Leads', DR.int(L7.leads), `${DR.chg(L7.leads, P7.leads, 'up')} (was ${DR.int(P7.leads)})`),
+    DR.tile('Sales', DR.int(L7.sales), `${DR.chg(L7.sales, P7.sales, 'up')} (was ${DR.int(P7.sales)})`),
+    DR.tile('Click rate', DR.pct(L7.ctr), `${DR.chg(L7.ctr, P7.ctr, 'up')} (was ${DR.pct(P7.ctr)})`),
+    DR.tile('Per sale', DR.eur(L7.cpa), `${DR.chg(L7.cpa, P7.cpa, 'down')} (was ${DR.eur(P7.cpa)})`),
+  ].join('');
+
+  // ── Tableau warehouse layer (matched by date) ──
+  const hasWH = Object.keys(WH.rows).length > 0;
+  const whDayKeys = ['regs', 'ftds', 'firstDep', 'deposits', 'ngr', 'ggr', 'depositors'];
+  const whSum = list => { const o = { days: 0 }; whDayKeys.forEach(k => o[k] = 0); list.forEach(d => { const r = WH.rows[d]; if (!r) return; o.days++; whDayKeys.forEach(k => o[k] += +r[k] || 0); }); return o; };
+  const calDays = (a, b) => { const out = []; for (let t = Date.parse(a + 'T00:00:00Z'); t <= Date.parse(b + 'T00:00:00Z'); t += 86400000) out.push(new Date(t).toISOString().slice(0, 10)); return out; };
+  const x = v => v == null || !isFinite(v) ? '—' : v.toFixed(2) + '×';
+  const late = (wh, sms) => { const n = wh - sms; return `<b>${n >= 0 ? '+' : ''}${DR.int(n)}</b> late`; };
+  const whTile = (l, v, s) => DR.tile(l, v, s).replace('class="dr-tile"', 'class="dr-tile wh"');
+  const whD = WH.rows[day];
+  document.getElementById('dr-wh-day-wrap').style.display = hasWH ? '' : 'none';
+  document.getElementById('dr-wh-day-tiles').innerHTML = !hasWH ? '' : !whD
+    ? '<div class="dr-empty">No Tableau row for this day yet. Drop a fresh Tableau export above.</div>'
+    : [
+      whTile('Registrations', DR.int(whD.regs), `SMS Edge leads ${DR.int(D.leads)} · ${late(whD.regs, D.leads)}`),
+      whTile('FTDs', DR.int(whD.ftds), `SMS Edge sales ${DR.int(D.sales)} · ${late(whD.ftds, D.sales)}`),
+      whTile('Cost per FTD', DR.eur(whD.ftds ? D.spend / whD.ftds : null), `SMS Edge per sale ${DR.eur(D.cpa)}`),
+      whTile('First deposits', DR.eur(whD.firstDep), `All deposits ${DR.eur(whD.deposits)}`),
+      whTile('NGR', DR.eur(whD.ngr), `GGR ${DR.eur(whD.ggr)}`),
+      whTile('NGR ÷ spend', x(D.spend ? whD.ngr / D.spend : null), `on ${DR.eur(D.spend)} SMS spend`),
+    ].join('');
+  const mDays = calDays(monthKey + '-01', day);
+  const whM = whSum(mDays);
+  document.getElementById('dr-wh-mtd-wrap').style.display = hasWH ? '' : 'none';
+  document.getElementById('dr-wh-mtd-tiles').innerHTML = !hasWH ? '' : [
+    whTile('Registrations', DR.int(whM.regs), `SMS Edge leads ${DR.int(MTD.leads)} · ${late(whM.regs, MTD.leads)}`),
+    whTile('FTDs', DR.int(whM.ftds), `SMS Edge sales ${DR.int(MTD.sales)} · ${late(whM.ftds, MTD.sales)}`),
+    whTile('Cost per FTD', DR.eur(whM.ftds ? MTD.spend / whM.ftds : null), `SMS Edge per sale ${DR.eur(MTD.cpa)}`),
+    whTile('Deposits', DR.eur(whM.deposits), `First deposits ${DR.eur(whM.firstDep)}`),
+    whTile('NGR', DR.eur(whM.ngr), `GGR ${DR.eur(whM.ggr)}`),
+    whTile('NGR ÷ spend', x(MTD.spend ? whM.ngr / MTD.spend : null), `Tableau covers ${whM.days} of ${mDays.length} days`),
+  ].join('');
+
+  // Day-by-day comparison (last 30 calendar days to the report day)
+  document.getElementById('dr-cmp-card').style.display = hasWH ? '' : 'none';
+  if (hasWH) {
+    const byDay = {};
+    upTo.forEach(r => { (byDay[r.d] = byDay[r.d] || []).push(r); });
+    const cmpDays = calDays(shift(29), day).reverse().filter(d => byDay[d] || WH.rows[d]);
+    document.getElementById('dr-cmp').innerHTML = cmpDays.map(d => {
+      const s = DR.sum(byDay[d] || []), w = WH.rows[d];
+      const cell = v => w ? v : '<span class="m">—</span>';
+      return `<tr${d === day ? ' style="background:#EFF6FF"' : ''}>
+        <td>${DR.dayLabel(d).replace(/ \d{4}$/, '')}</td><td>${DR.eur(s.spend)}</td><td>${DR.int(s.leads)}</td><td>${cell(DR.int(w && w.regs))}</td>
+        <td>${DR.int(s.sales)}</td><td>${cell('<b>' + DR.int(w && w.ftds) + '</b>')}</td><td>${cell(DR.int(w && (w.ftds - s.sales)))}</td>
+        <td>${cell(DR.eur(w && w.ftds ? s.spend / w.ftds : null))}</td><td>${cell(DR.eur(w && w.firstDep))}</td><td>${cell(DR.eur(w && w.deposits))}</td>
+        <td>${cell(DR.eur(w && w.ngr))}</td><td>${cell(x(w && s.spend ? w.ngr / s.spend : null))}</td></tr>`;
+    }).join('') || '<tr><td colspan="12" class="dr-empty">No overlapping days.</td></tr>';
+  }
+
+  // Trend chart: last 30 send days up to the report day
+  const tDays = days.filter(d => d <= day).slice(0, 30).reverse();
+  const tSum = tDays.map(d => DR.sum(upTo.filter(r => r.d === d)));
+  if (chartInstances['drTrend']) chartInstances['drTrend'].destroy();
+  const ctx = document.getElementById('dr-trend');
+  if (ctx && typeof Chart !== 'undefined') {
+    chartInstances['drTrend'] = new Chart(ctx, {
+      data: {
+        labels: tDays.map(d => new Date(d + 'T00:00:00Z').toLocaleDateString('en-GB', {day: 'numeric', month: 'short', timeZone: 'UTC'})),
+        datasets: [
+          { type: 'bar', label: 'Spend (€)', data: tSum.map(s => Math.round(s.spend)), backgroundColor: tDays.map(d => d === day ? '#2563EB' : '#93C5FD'), borderRadius: 3, yAxisID: 'y' },
+          { type: 'line', label: 'Leads', data: tSum.map(s => s.leads), borderColor: '#F59E0B', backgroundColor: '#F59E0B', tension: .3, pointRadius: 2, yAxisID: 'y1' },
+          { type: 'line', label: 'Sales', data: tSum.map(s => s.sales), borderColor: '#16A34A', backgroundColor: '#16A34A', tension: .3, pointRadius: 3, yAxisID: 'y1' },
+          ...(hasWH ? [{ type: 'line', label: 'Tableau FTDs', data: tDays.map(d => WH.rows[d] ? WH.rows[d].ftds : null), borderColor: '#7C3AED', backgroundColor: '#7C3AED', borderDash: [5, 4], tension: .3, pointRadius: 3, spanGaps: true, yAxisID: 'y1' }] : []),
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+        plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
+          tooltip: { callbacks: { label: c => c.dataset.yAxisID === 'y' ? ` Spend €${c.parsed.y.toLocaleString('en-US')}` : ` ${c.dataset.label} ${c.parsed.y}` } } },
+        scales: { y: { beginAtZero: true, ticks: { callback: v => '€' + v, font: { size: 10 } }, grid: { color: '#F1F5F9' } },
+                  y1: { beginAtZero: true, position: 'right', grid: { display: false }, ticks: { precision: 0, font: { size: 10 } } },
+                  x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 0, autoSkip: true } } }
+      }
+    });
+  }
+
+  // Breakdowns (this month to the report day, plus all time to the report day)
+  const brands = DR.breakdown(upTo, 'b', monthKey);
+  const countries = DR.breakdown(upTo, 'co', monthKey);
+  const pillCls = { 'Converting': 'good', 'Leads, no sales': 'warn', 'No leads': 'bad', 'Not sending': '' };
+  const bdRows = list => list.filter(x => x.flag !== 'Not sending').map(x => `<tr>
+      <td>${DR.esc(x.key)}</td><td>${DR.eur(x.now.spend)}</td><td>${DR.int(x.now.leads)}</td><td>${DR.int(x.now.sales)}</td>
+      <td>${DR.eur(x.now.cpl)}</td><td>${DR.eur(x.now.cpa)}</td><td><span class="dr-pill ${pillCls[x.flag]}">${x.flag}</span></td></tr>`).join('')
+    || '<tr><td colspan="7" class="dr-empty">No sends this month yet.</td></tr>';
+  document.getElementById('dr-brands').innerHTML = bdRows(brands);
+  document.getElementById('dr-countries').innerHTML = bdRows(countries);
+
+  // Campaigns sent on the report day
+  const dayRows = upTo.filter(r => r.d === day).sort((a, b) => (b.cost || 0) - (a.cost || 0));
+  document.getElementById('dr-camps-title').textContent = `Campaigns sent · ${DR.dayLabel(day)} (${dayRows.length})`;
+  document.getElementById('dr-camps').innerHTML = dayRows.map(r => `<tr>
+      <td>${DR.esc(r.name)}</td><td>${DR.esc(r.b)}</td><td>${DR.esc(r.co)}</td><td>${DR.int(r.sent)}</td><td>${DR.int(r.clicks)}</td>
+      <td>${DR.pct(r.sent ? r.clicks / r.sent : null)}</td><td>${DR.int(r.leads)}</td><td>${DR.int(r.sales)}</td><td>${DR.eur2(r.cost)}</td></tr>`).join('')
+    || '<tr><td colspan="9" class="dr-empty">No campaigns.</td></tr>';
+
+  // Findings & actions — simple rules over the same numbers
+  const F = [], A = [];
+  const names = arr => arr.map(x => `<b>${DR.esc(x.key)}</b> ${DR.eur(x.v)}`).join(', ');
+  if (D.campaigns && P.campaigns) {
+    const s = D.sales - P.sales, l = D.leads - P.leads;
+    F.push({ c: D.sales >= P.sales ? 'g' : 'y', t: `<b>Day over day:</b> ${DR.int(D.sales)} sale${D.sales === 1 ? "" : "s"} (${s >= 0 ? '+' : ''}${s}) and ${DR.int(D.leads)} lead${D.leads === 1 ? "" : "s"} (${l >= 0 ? '+' : ''}${l}) on ${DR.eur(D.spend)} spend, vs ${DR.eur(P.spend)} the previous send day.` });
+  }
+  if (MTD.cpa != null && ALL.cpa != null && MTD.cpa > ALL.cpa * 1.2)
+    F.push({ c: 'r', t: `<b>Cost per sale is up:</b> ${DR.eur(MTD.cpa)} this month vs ${DR.eur(ALL.cpa)} all time.` });
+  else if (MTD.cpa != null && ALL.cpa != null && MTD.cpa < ALL.cpa * 0.85)
+    F.push({ c: 'g', t: `<b>Cost per sale is improving:</b> ${DR.eur(MTD.cpa)} this month vs ${DR.eur(ALL.cpa)} all time.` });
+  if (hasWH && whM.days) {
+    const lateN = whM.ftds - MTD.sales;
+    F.push({ c: 'g', t: `<b>Late conversions:</b> Tableau shows <b>${DR.int(whM.ftds)}</b> FTDs this month vs ${DR.int(MTD.sales)} same-day sales in SMS Edge (${lateN >= 0 ? '+' : ''}${DR.int(lateN)}), so the real cost per FTD is <b>${DR.eur(whM.ftds ? MTD.spend / whM.ftds : null)}</b>, not ${DR.eur(MTD.cpa)}.` });
+    if (MTD.spend) {
+      const r = whM.ngr / MTD.spend;
+      F.push({ c: r >= 1 ? 'g' : 'r', t: `<b>NGR ÷ spend this month: ${x(r)}</b> (${DR.eur(whM.ngr)} NGR on ${DR.eur(MTD.spend)} spend)${whM.days < mDays.length ? ` — Tableau covers ${whM.days} of ${mDays.length} days` : ''}.` });
+    }
+  }
+  if (MTD.spend > 0 && MTD.sales === 0)
+    F.push({ c: 'r', t: `<b>No sales yet this month</b> on ${DR.eur(MTD.spend)} spend.` });
+
+  const deadCountries = countries.filter(x => x.all.spend >= 500 && x.all.sales === 0).map(x => ({ key: x.key, v: x.all.spend }));
+  if (deadCountries.length) {
+    F.push({ c: 'r', t: `<b>Countries with €500+ spent and never a sale:</b> ${names(deadCountries)}.` });
+    A.push(`Cap or pause sends to ${deadCountries.map(x => DR.esc(x.key)).join(', ')} until the offer or landing page is reviewed.`);
+  }
+  const stopBrands = brands.filter(x => x.now.spend >= 500 && x.now.sales === 0).map(x => ({ key: x.key, v: x.now.spend }));
+  if (stopBrands.length) {
+    F.push({ c: 'y', t: `<b>Brands over €500 this month with no sale:</b> ${names(stopBrands)}.` });
+    A.push(`Apply the stop rule (pause a brand after €500 with no sale) to ${stopBrands.map(x => DR.esc(x.key)).join(', ')}.`);
+  }
+  const noLeads = [...brands, ...countries].filter(x => x.all.spend >= 200 && x.all.leads === 0 && x.flag !== 'Not sending').map(x => ({ key: x.key, v: x.all.spend }));
+  if (noLeads.length) {
+    F.push({ c: 'y', t: `<b>Sending with no leads at all:</b> ${names(noLeads)} (all-time spend).` });
+    A.push(`Pause ${noLeads.map(x => DR.esc(x.key)).join(', ')} — no leads to show for the spend.`);
+  }
+  const leaky = countries.filter(x => x.all.leads >= 20 && x.all.sales === 0);
+  if (leaky.length) {
+    F.push({ c: 'y', t: `<b>Leads not turning into sales:</b> ${leaky.map(x => `<b>${DR.esc(x.key)}</b> ${DR.int(x.all.leads)} leads, 0 sales`).join('; ')}.` });
+    A.push(`Check lead quality and sale tracking for ${leaky.map(x => DR.esc(x.key)).join(', ')}.`);
+  }
+  const best = countries.filter(x => x.all.sales >= 3 && x.all.cpa != null).sort((a, b) => a.all.cpa - b.all.cpa).slice(0, 2);
+  const bestBrands = brands.filter(x => x.now.sales > 0).sort((a, b) => a.now.cpa - b.now.cpa).slice(0, 3);
+  if (best.length) {
+    F.push({ c: 'g', t: `<b>What works:</b> ${best.map(x => `<b>${DR.esc(x.key)}</b> ${DR.int(x.all.sales)} sales at ${DR.eur(x.all.cpa)} each`).join('; ')}` +
+      (bestBrands.length ? `. Best brands this month: ${bestBrands.map(x => `<b>${DR.esc(x.key)}</b> (${DR.int(x.now.sales)} sale${x.now.sales === 1 ? "" : "s"}, ${DR.eur(x.now.cpa)} per sale)`).join(', ')}.` : '.') });
+    A.push(`Move freed-up budget to ${best.map(x => DR.esc(x.key)).join(' and ')}${bestBrands.length ? ' (' + bestBrands.map(x => DR.esc(x.key)).join(', ') + ')' : ''} — lowest cost per sale.`);
+  }
+  if (L7.spend && P7.spend && L7.spend > P7.spend * 1.2 && !(L7.sales > P7.sales))
+    F.push({ c: 'r', t: `<b>Spend is growing faster than sales:</b> last 7 days ${DR.eur(L7.spend)} (was ${DR.eur(P7.spend)}) for ${DR.int(L7.sales)} sales (was ${DR.int(P7.sales)}).` });
+
+  document.getElementById('dr-findings').innerHTML = F.map(x => `<li class="${x.c}"><span>${x.t}</span></li>`).join('') || '<li><span>Nothing stands out.</span></li>';
+  document.getElementById('dr-actions').innerHTML = A.map(t => `<li><span>${t}</span></li>`).join('') || '<li><span>No actions suggested — keep current allocation.</span></li>';
+}
+
+function renderWarehouseStatus() {
+  const st = document.getElementById('dr-wh-status');
+  if (!st) return;
+  const days = Object.keys(WH.rows).sort();
+  const summary = days.length
+    ? `Tableau data on file: <b>${days.length} days</b> (${DR.dayLabel(days[0])} – ${DR.dayLabel(days[days.length - 1])})` +
+      (WH.meta ? ` · last upload ${DR.esc(WH.meta.file)} on ${new Date(WH.meta.at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}` : '') +
+      (WH.db ? ' · saved for everyone' : ' · <span title="Run docs/warehouse_daily.sql in Supabase to share it with everyone">saved in this browser only</span>')
+    : 'No Tableau data yet — the report below uses SMS Edge same-day conversions only.';
+  st.innerHTML = (WH.lastMsg ? WH.lastMsg + '<br>' : '') + summary;
 }
 
 // ── KPI UPDATES ────────────────────────────
@@ -5865,45 +6486,34 @@ uploadZone.addEventListener('drop', e => {
 });
 uploadZone.addEventListener('click', () => document.getElementById('csvInput').click());
 
+// Every upload button / drop zone goes through handleReportFiles, which reads
+// CSV or Excel and routes Tableau exports to the warehouse data and SMS Edge
+// campaign exports to importCampaignCSVText below.
 function handleFileUpload(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = evt => {
-    try {
-      const newCampaigns = parseCSVData(evt.target.result);
-      if (newCampaigns.length === 0) {
-        alert('No valid campaign rows found in CSV. Check file format.');
-        return;
-      }
-      // Replace global campaigns array
-      campaigns.length = 0;
-      newCampaigns.forEach(c => { c.country = normalizeCountry(c.country); campaigns.push(c); });
-      filteredCampaigns = [...campaigns];
+  const files = e.target.files;
+  if (!files || !files.length) return;
+  handleReportFiles(files);
+  if (e.target && 'value' in e.target) { try { e.target.value = ''; } catch (_) {} }
+}
 
-      // Rebuild filter dropdowns
-      rebuildFilterOptions();
+// Returns the number of campaigns loaded (0 if none were found).
+function importCampaignCSVText(text, file) {
+  const newCampaigns = parseCSVData(text);
+  if (newCampaigns.length === 0) return 0;
+  // Replace global campaigns array
+  campaigns.length = 0;
+  newCampaigns.forEach(c => { c.country = normalizeCountry(c.country); campaigns.push(c); });
+  filteredCampaigns = [...campaigns];
 
-      // Reset filters and refresh everything
-      resetFilters();
-      saveCampaignBatch(campaigns).then(() => setDbStatus('live', 'Live'));
+  // Rebuild filter dropdowns
+  rebuildFilterOptions();
 
-      // Update upload zone to show success
-      const zone = document.getElementById('uploadZone');
-      zone.innerHTML = `<div style="pointer-events:none">
-        <div style="font-size:18px;margin-bottom:8px">✅</div>
-        <div style="font-weight:600;color:#16A34A">${newCampaigns.length} campaigns loaded from ${file.name}</div>
-        <div style="font-size:12px;color:#64748B;margin-top:4px">Dashboard updated in real-time • Drop another CSV to refresh</div>
-      </div><input id="csvInput" type="file" accept=".csv" onchange="handleFileUpload(event)" style="display:none"/>`;
-      zone.addEventListener('click', () => document.getElementById('csvInput').click());
+  // Reset filters and refresh everything
+  resetFilters();
+  saveCampaignBatch(campaigns).then(() => setDbStatus('live', 'Live'));
 
-      console.log(`Loaded ${newCampaigns.length} campaigns from ${file.name}`);
-    } catch (err) {
-      console.error('CSV Parse Error:', err);
-      alert('Error parsing CSV: ' + err.message);
-    }
-  };
-  reader.readAsText(file);
+  console.log(`Loaded ${newCampaigns.length} campaigns from ${file.name}`);
+  return newCampaigns.length;
 }
 
 // ── CSV PARSER ─────────────────────────────
