@@ -632,6 +632,12 @@ tbody tr:hover{background:#F8FAFC}
       .dr-add select{border:1.5px solid #E2E8F0;border-radius:8px;padding:6px;font-size:12px;background:#fff}
       .dr-add button{border:none;background:#2563EB;color:#fff;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer}
       .dr-note-status{font-size:11px;color:#94A3B8;margin-top:6px}
+      .rg-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:12px;color:#64748B}
+      .rg-bar label{display:flex;align-items:center;gap:6px}
+      .rg-bar input[type=date]{border:1.5px solid #E2E8F0;border-radius:8px;padding:6px 8px;font-size:13px;background:#fff;color:#0F172A}
+      .rg-presets{display:flex;flex-wrap:wrap;gap:6px}
+      .rg-more{margin-top:14px;font-size:13px}
+      .rg-more summary{cursor:pointer;font-weight:600;color:#2563EB}
       .tg-head{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start;justify-content:space-between}
       .tg-toggle{display:inline-flex;background:#F1F5F9;border-radius:999px;padding:3px}
       .tg-toggle button{border:none;background:none;padding:6px 14px;border-radius:999px;font-size:12px;font-weight:600;color:#475569;cursor:pointer}
@@ -661,6 +667,35 @@ tbody tr:hover{background:#F8FAFC}
       <input type="file" id="dr-file" accept=".csv,.tsv,.txt,.xlsx,.xls,.xlsm" multiple style="display:none" onchange="handleReportFiles(this.files); this.value=''">
       <div class="dr-drop-main">📥 <b>Drop files here</b> or click to choose: <b>Tableau</b> Daily Summary and/or Monthly Summary, and/or the <b>SMS Edge</b> campaigns export. CSV or Excel, several at once.</div>
       <div class="dr-drop-status" id="dr-wh-status"></div>
+    </div>
+
+    <div class="dr-sec">Date range</div>
+    <div class="card">
+      <div class="rg-bar">
+        <label>From <input type="date" id="rg-from" onchange="this.dataset.set='1'; renderRange()"></label>
+        <label>To <input type="date" id="rg-to" onchange="this.dataset.set='1'; renderRange()"></label>
+        <div class="rg-presets">
+          <button type="button" class="tg-btn" onclick="setRange('7')">Last 7 days</button>
+          <button type="button" class="tg-btn" onclick="setRange('14')">Last 14 days</button>
+          <button type="button" class="tg-btn" onclick="setRange('month')">This month</button>
+          <button type="button" class="tg-btn" onclick="setRange('prev')">Last month</button>
+        </div>
+      </div>
+      <div class="dr-sub" id="rg-lede" style="margin:12px 0 10px"></div>
+      <div class="dr-tiles" id="rg-tiles"></div>
+      <div id="rg-wh-wrap" style="display:none;margin-top:12px"><div class="dr-tiles" id="rg-wh-tiles"></div></div>
+      <div style="position:relative;height:240px;margin-top:16px"><canvas id="rg-chart"></canvas></div>
+      <details class="rg-more">
+        <summary>By day, brand and country</summary>
+        <div class="dr-wrap" style="margin-top:10px"><table class="dr-table">
+          <thead><tr><th>Day</th><th>Campaigns</th><th>Sent</th><th>Spend</th><th>Leads</th><th>Sales</th><th>Per sale</th><th>Tableau regs</th><th>Tableau FTDs</th><th>Cost per FTD</th></tr></thead>
+          <tbody id="rg-days"></tbody>
+        </table></div>
+        <div class="dr-two" style="margin-top:14px">
+          <div class="dr-wrap"><table class="dr-table"><thead><tr><th>Brand</th><th>Spend</th><th>Leads</th><th>Sales</th><th>Per sale</th></tr></thead><tbody id="rg-brands"></tbody></table></div>
+          <div class="dr-wrap"><table class="dr-table"><thead><tr><th>Country</th><th>Spend</th><th>Leads</th><th>Sales</th><th>Per sale</th></tr></thead><tbody id="rg-countries"></tbody></table></div>
+        </div>
+      </details>
     </div>
 
     <div class="dr-sec">The day · SMS Edge (same-day)</div>
@@ -5111,6 +5146,7 @@ function renderDailyReport() {
   DR.lastF = F; DR.lastA = A;
   paintFindingsActions();
   renderTargets();
+  renderRange();
 }
 
 // ── MANUAL FINDINGS / ACTIONS ───────────────
@@ -5392,6 +5428,119 @@ document.getElementById('tg-metric')?.addEventListener('click', e => {
   document.querySelectorAll('#tg-metric button').forEach(x => x.classList.toggle('on', x === b));
   renderTargets();
 });
+
+// ── DATE RANGE ──────────────────────────────
+// Totals for any From–To window, compared with the same number of days just before it.
+const RG = {
+  iso: t => new Date(t).toISOString().slice(0, 10),
+  add: (d, n) => RG.iso(Date.parse(d + 'T00:00:00Z') + n * 86400000),
+  days(a, b) { const out = []; for (let t = Date.parse(a + 'T00:00:00Z'); t <= Date.parse(b + 'T00:00:00Z'); t += 86400000) out.push(RG.iso(t)); return out; },
+  latest() { const ds = DR.rows().map(r => r.d).sort(); return ds[ds.length - 1] || RG.iso(Date.now()); },
+};
+function setRange(kind) {
+  const end = RG.latest();
+  const f = document.getElementById('rg-from'), t = document.getElementById('rg-to');
+  if (kind === 'month') { f.value = end.slice(0, 8) + '01'; t.value = end; }
+  else if (kind === 'prev') {
+    const [y, m] = end.split('-').map(Number);
+    f.value = RG.iso(Date.UTC(y, m - 2, 1)); t.value = RG.iso(Date.UTC(y, m - 1, 0));
+  } else { t.value = end; f.value = RG.add(end, -(Number(kind) - 1)); }
+  f.dataset.set = t.dataset.set = '1';
+  renderRange();
+}
+function renderRange() {
+  const f = document.getElementById('rg-from'), t = document.getElementById('rg-to');
+  if (!f || !t || !window.__liveDataLoaded) return;
+  const all = DR.rows();
+  if (!all.length) return;
+  const end = RG.latest();
+  if (!f.dataset.set || !f.value) f.value = RG.add(end, -6);
+  if (!t.dataset.set || !t.value) t.value = end;
+  if (f.value > t.value) [f.value, t.value] = [t.value, f.value];
+  const a = f.value, b = t.value;
+  const span = RG.days(a, b);
+  const pa = RG.add(a, -span.length), pb = RG.add(a, -1);
+  const inR = all.filter(r => r.d >= a && r.d <= b);
+  const S = DR.sum(inR), P = DR.sum(all.filter(r => r.d >= pa && r.d <= pb));
+  const sendDays = new Set(inR.map(r => r.d)).size;
+  const short = d => DR.dayLabel(d).replace(/ \d{4}$/, '');
+  const was = `vs ${short(pa)} – ${short(pb)}`;
+
+  document.getElementById('rg-lede').innerHTML =
+    `<b>${short(a)} – ${short(b)}</b> · ${span.length} day${span.length === 1 ? '' : 's'}, ${sendDays} with sends. Changes compare with the ${span.length} day${span.length === 1 ? '' : 's'} before (${short(pa)} – ${short(pb)}).`;
+  document.getElementById('rg-tiles').innerHTML = [
+    DR.tile('Spend', DR.eur(S.spend), `${DR.chg(S.spend, P.spend, 'none')} (was ${DR.eur(P.spend)})`),
+    DR.tile('SMS sent', DR.int(S.sent), `${DR.chg(S.sent, P.sent, 'none')} · ${DR.int(S.campaigns)} campaigns`),
+    DR.tile('Click rate', DR.pct(S.ctr), `${DR.chg(S.ctr, P.ctr, 'up')} (was ${DR.pct(P.ctr)})`),
+    DR.tile('Leads', DR.int(S.leads), `${DR.chg(S.leads, P.leads, 'up')} (was ${DR.int(P.leads)})`),
+    DR.tile('Sales', DR.int(S.sales), `${DR.chg(S.sales, P.sales, 'up')} (was ${DR.int(P.sales)})`),
+    DR.tile('Per sale', DR.eur(S.cpa), `${DR.chg(S.cpa, P.cpa, 'down')} · per lead ${DR.eur(S.cpl)}`),
+  ].join('');
+
+  // Tableau layer (late conversions) for the same days
+  const keys = ['regs', 'ftds', 'firstDep', 'deposits', 'ngr', 'ggr'];
+  const wsum = ds => { const o = { days: 0 }; keys.forEach(k => o[k] = 0); ds.forEach(d => { const r = WH.rows[d]; if (!r) return; o.days++; keys.forEach(k => o[k] += +r[k] || 0); }); return o; };
+  const W = wsum(span), WP = wsum(RG.days(pa, pb));
+  const hasWH = W.days > 0;
+  document.getElementById('rg-wh-wrap').style.display = hasWH ? '' : 'none';
+  const wt = (l, v, s) => DR.tile(l, v, s).replace('class="dr-tile"', 'class="dr-tile wh"');
+  const lateN = (w, s) => `<b>${w - s >= 0 ? '+' : ''}${DR.int(w - s)}</b> late`;
+  const cpf = W.ftds ? S.spend / W.ftds : null;
+  document.getElementById('rg-wh-tiles').innerHTML = !hasWH ? '' : [
+    wt('Tableau regs', DR.int(W.regs), `SMS Edge leads ${DR.int(S.leads)} · ${lateN(W.regs, S.leads)}`),
+    wt('Tableau FTDs', DR.int(W.ftds), `${WP.days ? DR.chg(W.ftds, WP.ftds, 'up') + ' · ' : ''}SMS Edge sales ${DR.int(S.sales)} · ${lateN(W.ftds, S.sales)}`),
+    wt('Cost per FTD', DR.eur(cpf), WP.days && WP.ftds ? `${DR.chg(cpf, P.spend / WP.ftds, 'down')} (was ${DR.eur(P.spend / WP.ftds)})` : `SMS Edge per sale ${DR.eur(S.cpa)}`),
+    wt('Deposits', DR.eur(W.deposits), `First deposits ${DR.eur(W.firstDep)}`),
+    wt('NGR', DR.eur(W.ngr), `GGR ${DR.eur(W.ggr)}`),
+    wt('NGR ÷ spend', S.spend ? (W.ngr / S.spend).toFixed(2) + '×' : '—', W.days < span.length ? `Tableau covers ${W.days} of ${span.length} days` : 'Tableau covers every day'),
+  ].join('');
+
+  // Per-day figures
+  const byDay = {};
+  inR.forEach(r => { (byDay[r.d] = byDay[r.d] || []).push(r); });
+  const dayStats = span.map(d => ({ d, s: DR.sum(byDay[d] || []), w: WH.rows[d] || null }));
+
+  if (chartInstances['rgChart']) chartInstances['rgChart'].destroy();
+  const ctx = document.getElementById('rg-chart');
+  if (ctx && typeof Chart !== 'undefined') {
+    chartInstances['rgChart'] = new Chart(ctx, {
+      data: {
+        labels: dayStats.map(x => new Date(x.d + 'T00:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' })),
+        datasets: [
+          { type: 'bar', label: 'Spend (€)', data: dayStats.map(x => Math.round(x.s.spend)), backgroundColor: '#93C5FD', borderRadius: 3, yAxisID: 'y' },
+          { type: 'line', label: 'Leads', hidden: true, data: dayStats.map(x => x.s.leads), borderColor: '#F59E0B', backgroundColor: '#F59E0B', tension: .3, pointRadius: 2, yAxisID: 'y1' },
+          { type: 'line', label: 'Sales', data: dayStats.map(x => x.s.sales), borderColor: '#16A34A', backgroundColor: '#16A34A', tension: .3, pointRadius: 3, yAxisID: 'y1' },
+          ...(hasWH ? [{ type: 'line', label: 'Tableau FTDs', data: dayStats.map(x => x.w ? x.w.ftds : null), borderColor: '#7C3AED', backgroundColor: '#7C3AED', borderDash: [5, 4], tension: .3, pointRadius: 3, spanGaps: true, yAxisID: 'y1' }] : []),
+        ]
+      },
+      options: {
+        animation: false, responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+        plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
+          tooltip: { callbacks: { label: c => c.dataset.yAxisID === 'y' ? ` Spend €${c.parsed.y.toLocaleString('en-US')}` : ` ${c.dataset.label} ${c.parsed.y}` } } },
+        scales: { y: { beginAtZero: true, ticks: { callback: v => '€' + v, font: { size: 10 } }, grid: { color: '#F1F5F9' } },
+                  y1: { beginAtZero: true, position: 'right', grid: { display: false }, ticks: { precision: 0, font: { size: 10 } } },
+                  x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 0, autoSkip: true } } }
+      }
+    });
+  }
+
+  const m = '<span class="m">—</span>';
+  const dRow = (label, s, w, style) => `<tr${style ? ` style="${style}"` : ''}><td>${label}</td><td>${DR.int(s.campaigns)}</td><td>${DR.int(s.sent)}</td><td>${DR.eur(s.spend)}</td>
+    <td>${DR.int(s.leads)}</td><td>${DR.int(s.sales)}</td><td>${DR.eur(s.cpa)}</td>
+    <td>${w ? DR.int(w.regs) : m}</td><td>${w ? '<b>' + DR.int(w.ftds) + '</b>' : m}</td><td>${w && w.ftds ? DR.eur(s.spend / w.ftds) : m}</td></tr>`;
+  document.getElementById('rg-days').innerHTML = dayStats.slice().reverse().map(x => dRow(DR.dayLabel(x.d).replace(/ \d{4}$/, ''), x.s, x.w)).join('') +
+    dRow('<b>Total</b>', S, hasWH ? W : null, 'border-top:2px solid #CBD5E1;font-weight:600');
+
+  const group = key => {
+    const g = {};
+    inR.forEach(r => { (g[r[key]] = g[r[key]] || []).push(r); });
+    return Object.entries(g).map(([k, rs]) => ({ k, s: DR.sum(rs) })).sort((x, y) => y.s.spend - x.s.spend)
+      .map(x => `<tr><td>${DR.esc(x.k)}</td><td>${DR.eur(x.s.spend)}</td><td>${DR.int(x.s.leads)}</td><td>${DR.int(x.s.sales)}</td><td>${DR.eur(x.s.cpa)}</td></tr>`).join('')
+      || '<tr><td colspan="5" class="dr-empty">No sends in this range.</td></tr>';
+  };
+  document.getElementById('rg-brands').innerHTML = group('b');
+  document.getElementById('rg-countries').innerHTML = group('co');
+}
 
 // ── KPI UPDATES ────────────────────────────
 function updateKPIs() {
