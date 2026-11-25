@@ -4778,6 +4778,10 @@ const DR = {
   monthLabel: m => m ? new Date(m + '-01T00:00:00Z').toLocaleDateString('en-GB', {month: 'short', year: 'numeric', timeZone: 'UTC'}) : '—',
   dayLabel: d => d ? new Date(d + 'T00:00:00Z').toLocaleDateString('en-GB', {weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC'}) : '—',
   _bk: {},
+  // The report works on complete days only: today is still in progress, so
+  // findings, month to date and run rates are "as of yesterday".
+  today() { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`; },
+  asOf() { const n = new Date(); n.setDate(n.getDate() - 1); return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`; },
   brandOf(c) {
     const b = c.brand || (typeof extractBrandFromName === 'function' ? extractBrandFromName(c.name) : '') || String(c.name || '').split('_')[0].trim() || 'Unknown';
     const k = b.toLowerCase();
@@ -4839,9 +4843,11 @@ function renderDailyReport() {
     return;
   }
   const prevSel = sel.value;
-  sel.innerHTML = days.map(d => `<option value="${d}">${DR.dayLabel(d)}</option>`).join('');
-  // Default to the latest day with sends; keep an earlier day only if the user picked it
-  const day = sel.dataset.picked && days.includes(prevSel) ? prevSel : days[0];
+  const todayStr = DR.today();
+  sel.innerHTML = days.map(d => `<option value="${d}">${DR.dayLabel(d)}${d >= todayStr ? ' (today, in progress)' : ''}</option>`).join('');
+  // Default to the latest COMPLETE day with sends (yesterday or before — today is still running);
+  // keep another day only if the user picked it
+  const day = sel.dataset.picked && days.includes(prevSel) ? prevSel : (days.find(d => d < todayStr) || days[0]);
   sel.value = day;
 
   const prevDay = days[days.indexOf(day) + 1] || null;
@@ -4850,9 +4856,9 @@ function renderDailyReport() {
   const upTo = rows.filter(r => r.d <= day);
   const between = (a, b) => upTo.filter(r => r.d >= a && r.d <= b);
 
-  // "Month to date" is always the month we are in (not the picked report day's month)
-  const now = new Date();
-  const cur = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  // "Month to date" is the month we are in, counted up to yesterday (the last complete day);
+  // run rates divide by complete days. Not the picked report day's month.
+  const cur = DR.asOf();
   const [cy, cm, cd] = cur.split('-').map(Number);
   const dim = new Date(Date.UTC(cy, cm, 0)).getUTCDate();
   const monthKey = cur.slice(0, 7);
@@ -4876,7 +4882,8 @@ function renderDailyReport() {
   document.getElementById('dr-lede').innerHTML = (!window.__liveDataLoaded ? '<span style="color:#D97706;font-weight:600">Loading the latest data…</span> ' : !window.__campsFromDb ? '<span style="color:#DC2626;font-weight:600">Couldn\x27t load the live data, so this shows older built-in data. Refresh the page to try again.</span><br>' : '') +
     `On <b>${DR.dayLabel(day)}</b> we sent <b>${DR.int(D.campaigns)}</b> campaigns (<b>${DR.int(D.sent)}</b> SMS) for <b>${DR.eur(D.spend)}</b>, ` +
     `bringing <b>${DR.int(D.leads)}</b> lead${D.leads === 1 ? "" : "s"} and <b>${DR.int(D.sales)}</b> sale${D.sales === 1 ? "" : "s"}. ` +
-    `${monthName} to date: <b>${DR.eur(MTD.spend)}</b> spend, <b>${DR.int(MTD.sales)}</b> sales` +
+    (day >= todayStr ? '<span style="color:#D97706">Today is still in progress, so these numbers will grow.</span> ' : '') +
+    `${monthName} to date (to ${DR.dayLabel(cur).replace(/ \d{4}$/, '')}): <b>${DR.eur(MTD.spend)}</b> spend, <b>${DR.int(MTD.sales)}</b> sales` +
     (MTD.cpa != null ? ` at <b>${DR.eur(MTD.cpa)}</b> per sale` : '') +
     `; on pace for <b>${DR.eur(RR.spend)}</b> and <b>${DR.int(RR.sales)}</b> sales this month.`;
 
@@ -5310,8 +5317,7 @@ async function saveTargets() {
 function renderTargets() {
   if (!document.getElementById('tg-tiles') || !window.__liveDataLoaded) return;
   if (!TG.loaded) { TG.loaded = true; TG.load().then(renderTargets); }
-  const now = new Date();
-  const cur = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const cur = DR.asOf(); // complete days only (to yesterday)
   const curM = cur.slice(0, 7), cd = +cur.slice(8, 10);
   const dim = new Date(Date.UTC(+cur.slice(0, 4), +cur.slice(5, 7), 0)).getUTCDate();
   const rows = DR.rows().filter(r => r.d <= cur);
@@ -5435,7 +5441,8 @@ const RG = {
   iso: t => new Date(t).toISOString().slice(0, 10),
   add: (d, n) => RG.iso(Date.parse(d + 'T00:00:00Z') + n * 86400000),
   days(a, b) { const out = []; for (let t = Date.parse(a + 'T00:00:00Z'); t <= Date.parse(b + 'T00:00:00Z'); t += 86400000) out.push(RG.iso(t)); return out; },
-  latest() { const ds = DR.rows().map(r => r.d).sort(); return ds[ds.length - 1] || RG.iso(Date.now()); },
+  // last complete send day (yesterday or before); today is still in progress
+  latest() { const y = DR.asOf(); const ds = DR.rows().map(r => r.d).filter(d => d <= y).sort(); return ds[ds.length - 1] || y; },
 };
 function setRange(kind) {
   const end = RG.latest();
