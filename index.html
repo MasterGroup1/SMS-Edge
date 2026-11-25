@@ -794,9 +794,16 @@ tbody tr:hover{background:#F8FAFC}
     </div>
 
     <div class="card" style="margin-top:16px">
-      <div class="card-title dr-ct" id="dr-camps-title">Campaigns sent</div>
+      <div class="tg-head" style="margin-bottom:12px">
+        <div class="card-title dr-ct" style="margin:0" id="dr-camps-title">Campaigns sent</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+          <label class="dr-pick">Show <select id="dr-camps-period" onchange="DR.campPeriod = this.value; renderDailyReport()"><option value="day">Report day</option><option value="month">Month to date</option></select></label>
+          <label class="dr-pick">Brand <select id="dr-camps-brand" onchange="DR.campBrand = this.value; if (this.value) DR.campPeriod = 'month'; renderDailyReport()"><option value="">All brands</option></select></label>
+          <label class="dr-pick">Country <select id="dr-camps-geo" onchange="DR.campGeo = this.value; if (this.value) DR.campPeriod = 'month'; renderDailyReport()"><option value="">All countries</option></select></label>
+        </div>
+      </div>
       <div class="dr-wrap"><table class="dr-table">
-        <thead><tr><th>Campaign</th><th>Brand</th><th>Country</th><th>Sent</th><th>Clicks</th><th>Click rate</th><th>Leads</th><th>Sales</th><th>Spend</th></tr></thead>
+        <thead><tr><th>Day</th><th>Campaign</th><th>Brand</th><th>Country</th><th>Sent</th><th>Clicks</th><th>Click rate</th><th>Leads</th><th>Sales</th><th>Spend</th></tr></thead>
         <tbody id="dr-camps"></tbody>
       </table></div>
     </div>
@@ -4817,6 +4824,28 @@ const DR = {
     return `<span class="dr-chg ${cls}">${c > 0 ? '+' : '−'}${Math.round(Math.abs(c) * 100)}%</span>`;
   },
   tile: (label, value, sub) => `<div class="dr-tile"><div class="l">${label}</div><div class="v">${value}</div><div class="s">${sub || '&nbsp;'}</div></div>`,
+  // Campaigns-sent table: period (report day / month to date) + brand + country filters.
+  // Fills the three selects and the title; returns the filtered rows (by spend) and their total.
+  campFilter(day, dayRows, monthRows, monthName) {
+    const month = DR.campPeriod === 'month';
+    const base = month ? monthRows : dayRows;
+    const uniq = (list, k) => [...new Set(list.map(r => r[k]))].sort((a, b) => a.localeCompare(b));
+    const fill = (id, all, label, val) => {
+      const opts = uniq(monthRows, all); if (val && !opts.includes(val)) opts.push(val);
+      const el = document.getElementById(id);
+      el.innerHTML = `<option value="">${label}</option>` + opts.map(o => `<option value="${DR.esc(o)}">${DR.esc(o)}</option>`).join('');
+      el.value = val || '';
+    };
+    fill('dr-camps-brand', 'b', 'All brands', DR.campBrand);
+    fill('dr-camps-geo', 'co', 'All countries', DR.campGeo);
+    document.getElementById('dr-camps-period').value = month ? 'month' : 'day';
+    const rows = base.filter(r => (!DR.campBrand || r.b === DR.campBrand) && (!DR.campGeo || r.co === DR.campGeo))
+      .sort((a, b) => month ? (b.d.localeCompare(a.d) || (b.cost || 0) - (a.cost || 0)) : (b.cost || 0) - (a.cost || 0));
+    const what = [DR.campBrand, DR.campGeo].filter(Boolean).join(' · ');
+    document.getElementById('dr-camps-title').textContent =
+      `Campaigns sent · ${month ? monthName + ' to date' : DR.dayLabel(day)}${what ? ' · ' + what : ''} (${rows.length})`;
+    return { rows, tot: DR.sum(rows) };
+  },
   breakdown(rows, key, monthKey) {
     const groups = {};
     rows.forEach(r => { (groups[r[key]] = groups[r[key]] || []).push(r); });
@@ -5061,13 +5090,13 @@ function renderDailyReport() {
   document.getElementById('dr-countries').innerHTML = bdRows(countries).replace(/<tr>\s*<td>([^<]*)<\/td>/g, (m, k) =>
     `<tr class="dr-geo-row${k === DR.esc(DR.brandGeo || '') ? ' on' : ''}" data-geo="${k}" title="Show brands for ${k}"><td>${k}</td>`);
 
-  // Campaigns sent on the report day
-  const dayRows = upTo.filter(r => r.d === day).sort((a, b) => (b.cost || 0) - (a.cost || 0));
-  document.getElementById('dr-camps-title').textContent = `Campaigns sent · ${DR.dayLabel(day)} (${dayRows.length})`;
-  document.getElementById('dr-camps').innerHTML = dayRows.map(r => `<tr>
-      <td>${DR.esc(r.name)}</td><td>${DR.esc(r.b)}</td><td>${DR.esc(r.co)}</td><td>${DR.int(r.sent)}</td><td>${DR.int(r.clicks)}</td>
+  // Campaigns sent — the report day, or the whole month to date; filter by brand / country
+  const cam = DR.campFilter(day, upTo.filter(r => r.d === day), mtdRows, monthName);
+  document.getElementById('dr-camps').innerHTML = cam.rows.map(r => `<tr>
+      <td>${DR.dayLabel(r.d).replace(/ \d{4}$/, '')}</td><td>${DR.esc(r.name)}</td><td>${DR.esc(r.b)}</td><td>${DR.esc(r.co)}</td><td>${DR.int(r.sent)}</td><td>${DR.int(r.clicks)}</td>
       <td>${DR.pct(r.sent ? r.clicks / r.sent : null)}</td><td>${DR.int(r.leads)}</td><td>${DR.int(r.sales)}</td><td>${DR.eur2(r.cost)}</td></tr>`).join('')
-    || '<tr><td colspan="9" class="dr-empty">No campaigns.</td></tr>';
+    + (cam.rows.length ? `<tr style="border-top:2px solid #CBD5E1;font-weight:600"><td>Total</td><td>${DR.int(cam.tot.campaigns)} campaigns</td><td></td><td></td><td>${DR.int(cam.tot.sent)}</td><td>${DR.int(cam.tot.clicks)}</td>
+      <td>${DR.pct(cam.tot.ctr)}</td><td>${DR.int(cam.tot.leads)}</td><td>${DR.int(cam.tot.sales)}</td><td>${DR.eur2(cam.tot.spend)}</td></tr>` : '<tr><td colspan="10" class="dr-empty">No campaigns.</td></tr>');
 
   // Findings & actions — simple rules over the same numbers
   const F = [], A = [];
