@@ -638,6 +638,9 @@ tbody tr:hover{background:#F8FAFC}
       .rg-presets{display:flex;flex-wrap:wrap;gap:6px}
       .rg-more{margin-top:14px;font-size:13px}
       .rg-more summary{cursor:pointer;font-weight:600;color:#2563EB}
+      .dr-geo-row{cursor:pointer}
+      .dr-geo-row:hover td{background:#F8FAFC}
+      .dr-geo-row.on td{background:#EFF6FF;font-weight:600}
       .tg-head{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start;justify-content:space-between}
       .tg-toggle{display:inline-flex;background:#F1F5F9;border-radius:999px;padding:3px}
       .tg-toggle button{border:none;background:none;padding:6px 14px;border-radius:999px;font-size:12px;font-weight:600;color:#475569;cursor:pointer}
@@ -800,7 +803,10 @@ tbody tr:hover{background:#F8FAFC}
 
     <div class="dr-two" style="margin-top:16px">
       <div class="card">
-        <div class="card-title dr-ct">By brand · <span class="dr-month-name"></span> to date</div>
+        <div class="tg-head" style="margin-bottom:12px">
+          <div class="card-title dr-ct" style="margin:0">By brand · <span class="dr-month-name"></span> to date</div>
+          <label class="dr-pick">Country <select id="dr-brand-geo" onchange="DR.brandGeo = this.value; renderDailyReport()"><option value="">All countries</option></select></label>
+        </div>
         <div class="dr-wrap"><table class="dr-table">
           <thead><tr><th>Brand</th><th>Spend</th><th>Leads</th><th>Sales</th><th>Per lead</th><th>Per sale</th><th>Status</th></tr></thead>
           <tbody id="dr-brands"></tbody>
@@ -5040,8 +5046,20 @@ function renderDailyReport() {
       <td>${DR.esc(x.key)}</td><td>${DR.eur(x.now.spend)}</td><td>${DR.int(x.now.leads)}</td><td>${DR.int(x.now.sales)}</td>
       <td>${DR.eur(x.now.cpl)}</td><td>${DR.eur(x.now.cpa)}</td><td><span class="dr-pill ${pillCls[x.flag]}">${x.flag}</span></td></tr>`).join('')
     || '<tr><td colspan="7" class="dr-empty">No sends this month yet.</td></tr>';
-  document.getElementById('dr-brands').innerHTML = bdRows(brands);
-  document.getElementById('dr-countries').innerHTML = bdRows(countries);
+  // Brand table can be narrowed to one country (findings above still use all countries)
+  const geoSel = document.getElementById('dr-brand-geo');
+  const geoList = countries.filter(x => x.flag !== 'Not sending').map(x => x.key);
+  if (DR.brandGeo && !geoList.includes(DR.brandGeo)) geoList.push(DR.brandGeo);
+  geoSel.innerHTML = '<option value="">All countries</option>' + geoList.map(k => `<option value="${DR.esc(k)}">${DR.esc(k)}</option>`).join('');
+  geoSel.value = DR.brandGeo || '';
+  const geoBrands = DR.brandGeo ? DR.breakdown(toNow.filter(r => r.co === DR.brandGeo), 'b', monthKey) : brands;
+  const shownB = geoBrands.filter(x => x.flag !== 'Not sending');
+  const totB = DR.sum(toNow.filter(r => r.d.startsWith(monthKey) && (!DR.brandGeo || r.co === DR.brandGeo)));
+  document.getElementById('dr-brands').innerHTML = shownB.length
+    ? bdRows(geoBrands) + `<tr style="border-top:2px solid #CBD5E1;font-weight:600"><td>Total${DR.brandGeo ? ' · ' + DR.esc(DR.brandGeo) : ''}</td><td>${DR.eur(totB.spend)}</td><td>${DR.int(totB.leads)}</td><td>${DR.int(totB.sales)}</td><td>${DR.eur(totB.cpl)}</td><td>${DR.eur(totB.cpa)}</td><td></td></tr>`
+    : `<tr><td colspan="7" class="dr-empty">No sends${DR.brandGeo ? ' to ' + DR.esc(DR.brandGeo) : ''} this month yet.</td></tr>`;
+  document.getElementById('dr-countries').innerHTML = bdRows(countries).replace(/<tr>\s*<td>([^<]*)<\/td>/g, (m, k) =>
+    `<tr class="dr-geo-row${k === DR.esc(DR.brandGeo || '') ? ' on' : ''}" data-geo="${k}" title="Show brands for ${k}"><td>${k}</td>`);
 
   // Campaigns sent on the report day
   const dayRows = upTo.filter(r => r.d === day).sort((a, b) => (b.cost || 0) - (a.cost || 0));
@@ -5433,6 +5451,15 @@ document.getElementById('tg-metric')?.addEventListener('click', e => {
   TG.metric = b.dataset.m;
   document.querySelectorAll('#tg-metric button').forEach(x => x.classList.toggle('on', x === b));
   renderTargets();
+});
+
+// Click a country in "By country" → show that country's brands (click again to clear)
+document.getElementById('dr-countries')?.addEventListener('click', e => {
+  const tr = e.target.closest('tr[data-geo]');
+  if (!tr) return;
+  const g = tr.getAttribute('data-geo');
+  DR.brandGeo = DR.brandGeo === g ? '' : g;
+  renderDailyReport();
 });
 
 // ── DATE RANGE ──────────────────────────────
